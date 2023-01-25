@@ -1,8 +1,10 @@
 #pragma once
 
-#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "optional"
-#include "rclcpp/rclcpp.hpp" 
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/logger.hpp"
+#include "phnx_io_ros/serial.hpp"
+#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 
 namespace pir{
 
@@ -19,6 +21,7 @@ class PhnxIoRos : public rclcpp::Node{
 
         std::string _port{};
         int _baud_rate{};
+        serial::serial port{};
         double _max_throttle_speed{};
         double _max_brake_speed{};
 

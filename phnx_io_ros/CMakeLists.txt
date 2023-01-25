@@ -26,7 +26,7 @@ find_package(ackermann_msgs REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(phnx_io_ros src/phnx_io_ros.cpp src/serial.cpp)
+add_executable(phnx_io_ros src/phnx_io_ros.cpp src/serial.cpp src/phnx_io_ros_node.cpp)
 ament_target_dependencies(
   phnx_io_ros
   rclcpp
