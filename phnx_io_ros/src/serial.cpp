@@ -30,7 +30,7 @@ void serial::serial::setup_port(const char *search_term, int baud_rate, rclcpp::
         }
     }
     RCLCPP_INFO(log, "Found port: %s", *gstruct->gl_pathv);
-    serial::connect(*gstruct->gl_pathv, termios_baud);
+    serial::connect(*gstruct->gl_pathv, termios_baud, log);
 }
 
 ///Connect to a serial port
