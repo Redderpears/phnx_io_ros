@@ -24,16 +24,20 @@ namespace serial {
     private:
         struct termios tty;
         int port_number;
+        std::vector<char *> port_list;
     public:
 
         //Find and connect to a serial port
-        void setup_port(const char *search_term, int baud_rate, rclcpp::Logger log);
+        void setup_port(const char *search_term, int baud_rate, const rclcpp::Logger &log);
 
         //Connect to a serial port
-        void connect(const char *port, int baud, rclcpp::Logger log);
+        void connect(const char *port, int baud, const rclcpp::Logger &log);
 
         //Configure a serial port
-        void configure(int baud, rclcpp::Logger log);
+        void configure(int baud, const rclcpp::Logger &log);
+
+        //Close all connected serial ports
+        void close_connection(const rclcpp::Logger &log);
 
         //Read data from the serial port
         uint32_t read_packet(char *buf, int length);

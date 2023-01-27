@@ -8,8 +8,8 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     _max_throttle_speed = this->declare_parameter("max_throttle_speed", 1.0);
     _max_brake_speed = this->declare_parameter("max_brake_speed", 1.0);
 
-    _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/odom_ack", 10);
-    _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
+    _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
+    _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
             "/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
 
     //Setup serial connection
@@ -17,22 +17,20 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
 }
 
 ///Convert ackermann messages into CAN messages and send them to the CAN bus
-void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg) {
+void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
 
     //Copy the newest message into last_ack and move speed field into acceleration field
-    this->last_ack.header = msg->header;
-    this->last_ack.drive.acceleration = msg->drive.speed;
+    this->last_ack.acceleration = msg->speed;
     serial::message ser_msg{};
     ser_msg.length = 1;
 
     //Get percentage brake and throttle and send their respective messages
-    if(msg->drive.speed < 0){
-        uint8_t percent_brake = (msg->drive.speed*-1.0) / _max_brake_speed;
+    if (msg->speed < 0) {
+        uint8_t percent_brake = msg->speed  / _max_brake_speed;
         ser_msg.type = pir::CanMappings::SetBrake;
         ser_msg.data[0] = percent_brake;
-    }
-    else{
-        uint8_t percent_throttle = msg->drive.speed / _max_throttle_speed;
+    } else {
+        uint8_t percent_throttle = msg->speed / _max_throttle_speed;
         ser_msg.type = pir::CanMappings::SetThrottle;
         ser_msg.length = 1;
         ser_msg.data[0] = percent_throttle;
@@ -43,6 +41,11 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDriveStamped::Sha
     //send steering angle message
     ser_msg.type = pir::CanMappings::SetAngle;
     ser_msg.length = 1;
-    ser_msg.data[0] = msg->drive.steering_angle;
+    ser_msg.data[0] = msg->steering_angle;
     port.write_packet(reinterpret_cast<uint8_t *>(&ser_msg), 4);
+}
+
+pir::PhnxIoRos::~PhnxIoRos() {
+    //Clean up serial connection
+    port.close_connection(this->get_logger());
 }

@@ -1,9 +1,10 @@
 #include "phnx_io_ros/serial.hpp"
 #include <iostream>
 #include <glob.h>
+#include <filesystem>
 
 ///Search for and connect/configure a serial port
-void serial::serial::setup_port(const char *search_term, int baud_rate, rclcpp::Logger log) {
+void serial::serial::setup_port(const char *search_term, int baud_rate, const rclcpp::Logger &log) {
     int termios_baud{};
     switch (baud_rate) {
         case 9600:
@@ -20,21 +21,30 @@ void serial::serial::setup_port(const char *search_term, int baud_rate, rclcpp::
             break;
     }
 
-    glob_t *gstruct;
-    int result = glob(search_term, GLOB_MARK, NULL, gstruct);
+    //DO NOT INITIALIZE THIS WILL BREAK GLOB
+    glob_t gstruct;
+
+    int result = glob(search_term, GLOB_ERR, NULL, &gstruct);
+
+    //Ensure we actually found a serial port
     if (result != 0) {
         if (result == GLOB_NOMATCH) {
-            RCLCPP_ERROR(log, "Failed to find serial device using search term %s!", search_term);
+            RCLCPP_ERROR(log, "Failed to find serial device using search pattern %s!", search_term);
         } else {
             RCLCPP_ERROR(log, "Unknown glob error!");
         }
     }
-    RCLCPP_INFO(log, "Found port: %s", *gstruct->gl_pathv);
-    serial::connect(*gstruct->gl_pathv, termios_baud, log);
+    RCLCPP_INFO(log, "Found port: %s", *gstruct.gl_pathv);
+
+    //Connect to the found serial port
+    serial::connect(*gstruct.gl_pathv, termios_baud, log);
+
+    //Clean up after connection has finished
+    globfree(&gstruct);
 }
 
 ///Connect to a serial port
-void serial::serial::connect(const char *port, int baud, rclcpp::Logger log) {
+void serial::serial::connect(const char *port, int baud, const rclcpp::Logger &log) {
     std::cout << "Attempting to connect to port: " << port << std::endl;
     port_number = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (port_number < 0) {
@@ -46,7 +56,7 @@ void serial::serial::connect(const char *port, int baud, rclcpp::Logger log) {
 }
 
 ///Configure a serial port
-void serial::serial::configure(int baud, rclcpp::Logger log) {
+void serial::serial::configure(int baud, const rclcpp::Logger &log) {
     //Get params from port
     if (tcgetattr(port_number, &tty) != 0) {
         RCLCPP_ERROR(log, "Error from tcgetattr!");
@@ -87,4 +97,11 @@ uint32_t serial::serial::read_packet(char *buf, int length) {
 ///Write data to a serial port return is number of bytes written
 uint32_t serial::serial::write_packet(uint8_t *buf, int length) {
     return write(port_number, buf, length);
+}
+
+void serial::serial::close_connection(const rclcpp::Logger &log) {
+    int result = close(port_number);
+    if (result != 0) {
+        RCLCPP_ERROR(log, "Failed to properly close connection!");
+    }
 }

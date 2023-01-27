@@ -22,12 +22,14 @@ namespace pir {
     public:
         explicit PhnxIoRos(rclcpp::NodeOptions options);
 
+        ~PhnxIoRos() override;
+
     private:
 
-        std::optional<std::shared_ptr<rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>>> _acks_sub =
+        std::optional<std::shared_ptr<rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>>> _acks_sub =
                 std::nullopt;
 
-        std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>>>
+        std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>>
                 _odom_acks_pub = std::nullopt;
 
         std::string _port{};
@@ -35,9 +37,9 @@ namespace pir {
         serial::serial port{};
         double _max_throttle_speed{};
         double _max_brake_speed{};
-        ackermann_msgs::msg::AckermannDriveStamped last_ack{};
+        ackermann_msgs::msg::AckermannDrive last_ack{};
 
-        void send_can_cb(ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
+        void send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg);
 
     };
 
