@@ -12,6 +12,8 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
             "/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
 
+    port = serial::serial(this->get_logger());
+
     //Setup serial connection
     port.setup_port(_port.c_str(), _baud_rate, this->get_logger());
 }

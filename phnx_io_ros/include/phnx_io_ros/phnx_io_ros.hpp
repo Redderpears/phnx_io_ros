@@ -34,7 +34,7 @@ namespace pir {
 
         std::string _port{};
         int _baud_rate{};
-        serial::serial port{};
+        serial::serial port;
         double _max_throttle_speed{};
         double _max_brake_speed{};
         ackermann_msgs::msg::AckermannDrive last_ack{};
