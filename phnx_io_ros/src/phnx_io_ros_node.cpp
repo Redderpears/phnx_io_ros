@@ -15,7 +15,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     port = serial::serial(this->get_logger());
 
     //Setup serial connection
-    port.setup_port(_port.c_str(), _baud_rate, this->get_logger());
+    port.setup_port(_port.c_str(), _baud_rate);
 }
 
 ///Convert ackermann messages into CAN messages and send them to the CAN bus
@@ -49,5 +49,5 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 
 pir::PhnxIoRos::~PhnxIoRos() {
     //Clean up serial connection
-    port.close_connection(this->get_logger());
+    port.close_connection();
 }

@@ -20,6 +20,11 @@ namespace serial {
         uint8_t data[512];
     }__attribute__((packed));
 
+    struct port_info {
+        char *port_name;
+        int port_number;
+    };
+
     class serial {
     private:
         struct termios tty;
@@ -34,16 +39,16 @@ namespace serial {
         explicit serial(rclcpp::Logger log);
 
         //Find and connect to a serial port
-        void setup_port(const char *search_term, int baud_rate, const rclcpp::Logger &log);
+        void setup_port(const char *search_term, int baud_rate);
 
         //Connect to a serial port
-        void connect(const char *port, int baud, const rclcpp::Logger &log);
+        void connect(const char *port, int baud);
 
         //Configure a serial port
-        void configure(int baud, const rclcpp::Logger &log);
+        void configure(int baud);
 
         //Close all connected serial ports
-        void close_connection(const rclcpp::Logger &log) const;
+        void close_connection() const;
 
         //Read data from the serial port
         uint32_t read_packet(char *buf, int length) const;

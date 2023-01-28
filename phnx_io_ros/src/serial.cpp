@@ -9,7 +9,7 @@ serial::serial::serial(rclcpp::Logger logger) {
 }
 
 ///Search for and connect/configure a serial port
-void serial::serial::setup_port(const char *search_term, int baud_rate, const rclcpp::Logger &log) {
+void serial::serial::setup_port(const char *search_term, int baud_rate) {
     int termios_baud{};
     switch (baud_rate) {
         case 9600:
@@ -42,14 +42,14 @@ void serial::serial::setup_port(const char *search_term, int baud_rate, const rc
     logger("Found ports using pattern!", 0);
 
     //Connect to the found serial port
-    serial::connect(*gstruct.gl_pathv, termios_baud, log);
+    serial::connect(*gstruct.gl_pathv, termios_baud);
 
     //Clean up after connection has finished
     globfree64(&gstruct);
 }
 
 ///Connect to a serial port
-void serial::serial::connect(const char *port, int baud, const rclcpp::Logger &log) {
+void serial::serial::connect(const char *port, int baud) {
     std::cout << "Attempting to connect to port: " << port << std::endl;
     port_number = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (port_number < 0) {
@@ -57,14 +57,14 @@ void serial::serial::connect(const char *port, int baud, const rclcpp::Logger &l
         return;
     }
     logger("Connected to serial port!", 0);
-    configure(baud, log);
+    configure(baud);
 }
 
 ///Configure a serial port
-void serial::serial::configure(int baud, const rclcpp::Logger &log) {
+void serial::serial::configure(int baud) {
     //Get params from port
     if (tcgetattr(port_number, &tty) != 0) {
-        RCLCPP_ERROR(log, "Error from tcgetattr!");
+        logger("Error from tcgetattr!", -1);
         return;
     }
     //Set port parameters
@@ -107,7 +107,7 @@ uint32_t serial::serial::write_packet(uint8_t *buf, int length) const {
 }
 
 ///Closes connection to a serial port
-void serial::serial::close_connection(const rclcpp::Logger &log) const {
+void serial::serial::close_connection() const {
     int result = close(port_number);
     if (result != 0) {
         logger("Failed to properly close connection!", -1);
