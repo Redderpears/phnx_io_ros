@@ -32,12 +32,14 @@ namespace pir {
         std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>>
                 _odom_acks_pub = std::nullopt;
 
-        std::string _port{};
+        std::string _port_pattern{};
         int _baud_rate{};
         serial::serial port;
         double _max_throttle_speed{};
         double _max_brake_speed{};
         ackermann_msgs::msg::AckermannDrive last_ack{};
+        serial::port_info device_main{};
+        serial::port_info device_backup{};
 
         void send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg);
 

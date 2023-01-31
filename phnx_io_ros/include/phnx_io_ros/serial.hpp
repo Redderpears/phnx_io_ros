@@ -20,6 +20,7 @@ namespace serial {
         uint8_t data[512];
     }__attribute__((packed));
 
+    ///Contains the name of the serial port file and the file descriptor of the port if connected
     struct port_info {
         char *port_name;
         int port_number;
@@ -27,32 +28,55 @@ namespace serial {
 
     class serial {
     private:
-        struct termios tty;
-        int port_number;
+        struct termios tty{};
         rclcpp::Logger *log = nullptr;
+        std::vector<port_info> ports;
 
-        void logger(std::string str, int severity) const;
+        ///Logs with either RCLCPP logs or normal stdout/stderr
+        ///@param str string to write to the log
+        ///@param severity severity of the log, 1 is warning, 0 is info, -1 is error, and -2 is fatal
+        void logger(const std::string& str, int severity) const;
+
+        ///Configure a serial port
+        ///@param port_num file descriptor for a connected port
+        ///@param baud baud rate to use
+        void configure(int baud, int port_num);
 
     public:
-        serial();
+        serial() = default;
 
         explicit serial(rclcpp::Logger log);
 
-        //Find and connect to a serial port
-        void setup_port(const char *search_term, int baud_rate);
+        ///Find serial ports using a given pattern
+        ///@param pattern string pattern to use to for search
+        void find_ports(const std::string& pattern);
 
-        //Connect to a serial port
-        void connect(const char *port, int baud);
+        ///Connect and configure a serial port
+        ///@param port_name Name of a port to connect to
+        ///@param baud baud rate to use
+        void connect(const std::string& port_name, int baud);
 
-        //Configure a serial port
-        void configure(int baud);
+        ///Closes connection to a serial port
+        ///@param port_num file descriptor for a connected port
+        void close_connection(int port_num) const;
 
-        //Close all connected serial ports
-        void close_connection() const;
+        ///Get the list of found serial ports, port number will be -1 if port is not connected
+        ///@return Returns a vector of port info structs containing string filename of the
+        /// port and file descriptor used by termios
+        std::vector<port_info> get_ports();
 
-        //Read data from the serial port
-        uint32_t read_packet(char *buf, int length) const;
+        ///Read data from a connected serial port
+        ///@param buf buffer to store read data in
+        ///@param length length of data to read
+        ///@param port_num file descriptor for a connected port
+        ///@return number of bytes read
+        uint32_t read_packet(int port_num, char *buf, int length) const;
 
-        uint32_t write_packet(uint8_t *buf, int length) const;
+        ///Write data to a connected serial port
+        ///@param buf data to write to the port
+        ///@param length length of data
+        ///@param port_num file descriptor for a connected port
+        ///@return number of bytes written
+        uint32_t write_packet(int port_num, uint8_t *buf, int length) const;
     };
 }
