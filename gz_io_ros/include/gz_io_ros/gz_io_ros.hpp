@@ -15,14 +15,17 @@ namespace gir {
         explicit GzIoRos(rclcpp::NodeOptions options);
 
     private:
-        std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>>>
+        std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>>
                 _odom_acks_pub = std::nullopt;
 
         double _max_throttle_speed{};
         double _max_braking_speed{};
+        double _wheelbase{};
 
         void convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
                           geometry_msgs::msg::TwistStamped::ConstSharedPtr cmd_vel);
+        double convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase);
+
 
     };
 
