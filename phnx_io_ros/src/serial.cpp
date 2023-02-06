@@ -35,7 +35,7 @@ std::vector<serial::port_info> serial::serial::get_ports() {
 }
 
 void serial::serial::connect(const std::string &str, int baud) {
-    int termios_baud;
+    speed_t termios_baud;
     switch (baud) {
         case 9600:
             termios_baud = B9600;
@@ -71,7 +71,7 @@ void serial::serial::connect(const std::string &str, int baud) {
     configure(termios_baud, result);
 }
 
-void serial::serial::configure(int baud, int port_num) {
+void serial::serial::configure(speed_t baud, int port_num) {
     //Get params from port
     if (tcgetattr(port_num, &tty) != 0) {
         logger("Error from tcgetattr!", -2);

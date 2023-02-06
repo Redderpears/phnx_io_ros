@@ -4,7 +4,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/logger.hpp"
 #include "phnx_io_ros/serial.hpp"
-#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
+#include "ackermann_msgs/msg/ackermann_drive.hpp"
 
 namespace pir {
 

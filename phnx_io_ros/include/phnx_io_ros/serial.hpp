@@ -40,7 +40,7 @@ namespace serial {
         ///Configure a serial port
         ///@param port_num file descriptor for a connected port
         ///@param baud baud rate to use
-        void configure(int baud, int port_num);
+        void configure(speed_t baud, int port_num);
 
     public:
         serial() = default;
