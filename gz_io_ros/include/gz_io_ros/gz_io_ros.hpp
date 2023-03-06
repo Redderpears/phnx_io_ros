@@ -8,7 +8,17 @@
 #include "message_filters/sync_policies/approximate_time.h"
 
 namespace gir {
-    typedef message_filters::sync_policies::ApproximateTime<nav_msgs::msg::Odometry, geometry_msgs::msg::TwistStamped> sync_policy;
+
+    static const geometry_msgs::msg::Twist zero_twist = [] {
+        geometry_msgs::msg::Twist t;
+        t.angular.x = 0.0;
+        t.angular.y = 0.0;
+        t.angular.z = 0.0;
+        t.linear.x = 0.0;
+        t.linear.y = 0.0;
+        t.linear.z = 0.0;
+        return t;
+    }();
 
     class GzIoRos : public rclcpp::Node {
     public:
@@ -18,12 +28,24 @@ namespace gir {
         std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>>
                 _odom_acks_pub = std::nullopt;
 
+        rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr _twist_sub;
+        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odom_sub;
+
+        std::list<geometry_msgs::msg::Twist::SharedPtr> twist_queue;
+        std::list<nav_msgs::msg::Odometry::SharedPtr> odom_queue;
+
+
         double _max_throttle_speed{};
         double _max_braking_speed{};
         double _wheelbase{};
 
-        void convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
-                          geometry_msgs::msg::TwistStamped::ConstSharedPtr cmd_vel);
+        void
+        convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom, geometry_msgs::msg::Twist::ConstSharedPtr twist);
+
+        void odom_cb(nav_msgs::msg::Odometry::SharedPtr odom);
+
+        void twist_cb(geometry_msgs::msg::Twist::SharedPtr twist);
+
         double convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase);
 
 
