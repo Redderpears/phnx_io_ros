@@ -5,37 +5,29 @@
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 namespace gir {
-
-static const geometry_msgs::msg::Twist zero_twist = [] {
-    geometry_msgs::msg::Twist t;
-    t.angular.x = 0.0;
-    t.angular.y = 0.0;
-    t.angular.z = 0.0;
-    t.linear.x = 0.0;
-    t.linear.y = 0.0;
-    t.linear.z = 0.0;
-    return t;
-}();
 
 class GzIoRos : public rclcpp::Node {
 public:
     explicit GzIoRos(rclcpp::NodeOptions options);
 
-    ///@brief Convert odom/twist data to one Ackeramann message in defined format
+    ///@brief Aggregate ackermann message and odom message into an ackermann odom message
     ///@param odom Odom message to convert
-    ///@param twist Twist message to convert
+    ///@param ack Twist message to convert
     ackermann_msgs::msg::AckermannDrive convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
-                                                     geometry_msgs::msg::Twist::ConstSharedPtr twist) const;
+                                                     const ackermann_msgs::msg::AckermannDrive& ack) const;
 
-    ///@breif Callback for new odom messages
+    ///@breif Callback for new odom messages. Aggregates these with the current input state to create
+    /// ackermann odom messages.
     ///@param odom New message from topic
     void odom_cb(nav_msgs::msg::Odometry::SharedPtr odom);
 
-    ///@breif Callback for new twist messages
-    ///@param twist New message from topic
-    void twist_cb(geometry_msgs::msg::Twist::SharedPtr twist);
+    ///@breif Callback for new ack messages. This updates the current state of inputs. Also converts command
+    /// into separate steering and drive commands for gazebo.
+    ///@param ack New message from topic
+    void ack_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr ack);
 
     ///@breif publishes ackermann message
     ///@param msg message to publish
@@ -44,15 +36,16 @@ public:
 private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>::SharedPtr _odom_acks_pub;
 
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr _twist_sub;
+    /// Gazebo steering system
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr _steering_pub;
+    /// Gazebo drive system
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr _drive_pub;
+
+    rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>::SharedPtr _ack_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odom_sub;
 
-    std::list<geometry_msgs::msg::Twist::SharedPtr> twist_queue;
-    std::list<nav_msgs::msg::Odometry::SharedPtr> odom_queue;
-
-    ackermann_msgs::msg::AckermannDrive converted_msg{};
-
-    unsigned long max_buf_size{15};
+    /// The last ackermann command received. This is the assumed state of the throttle and steering wheel.
+    ackermann_msgs::msg::AckermannDrive last_msg{};
     double _wheelbase{};
 };
 
