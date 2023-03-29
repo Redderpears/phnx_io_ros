@@ -1,9 +1,17 @@
 cmake_minimum_required(VERSION 3.8)
 project(phnx_io_ros)
+include(FetchContent)
+
 
 if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif ()
+
+FetchContent_Declare(
+        libackermann
+        GIT_REPOSITORY https://github.com/iscumd/libackermann.git
+)
+FetchContent_MakeAvailable(libackermann)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -33,6 +41,7 @@ target_include_directories(phnx_io_ros PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_compile_features(phnx_io_ros PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_link_libraries(phnx_io_ros libackermann)
 
 install(TARGETS phnx_io_ros
         DESTINATION lib/${PROJECT_NAME})
@@ -55,6 +64,7 @@ if (BUILD_TESTING)
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>)
     # you MUST link external libraries to both executables, else the headers are not used for either
+    target_link_libraries(${PROJECT_NAME}-test libackermann)
 endif ()
 
 ament_package()

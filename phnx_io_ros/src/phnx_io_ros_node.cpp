@@ -1,5 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 
+#include "libackermann/libackermann.hpp"
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", options) {
@@ -53,7 +54,8 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     // acceleration field
     ackermann_msgs::msg::AckermannDrive pub_msg;
     pub_msg.acceleration = msg->speed;
-    pub_msg.steering_angle = msg->steering_angle;
+    auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
+    pub_msg.steering_angle = ratio(msg->steering_angle);
     if (!enc_msgs.empty()) {
         pub_msg.speed = enc_msgs.front().speed;
         enc_msgs.pop_front();
@@ -87,7 +89,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 
     // send steering angle message
     ser_msg.type = pir::CanMappings::SetAngle;
-    ser_msg.data[0] = static_cast<uint8_t>(msg->steering_angle);
+    ser_msg.data[0] = static_cast<uint8_t>(ratio(msg->steering_angle));
     RCLCPP_INFO(this->get_logger(), "Attempting to send message with type: %u, data: %u", ser_msg.type,
                 ser_msg.data[0]);
 
