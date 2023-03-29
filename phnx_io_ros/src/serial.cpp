@@ -1,40 +1,56 @@
 #include "phnx_io_ros/serial.hpp"
-#include <iostream>
+
 #include <glob.h>
 
-serial::serial::serial(rclcpp::Logger logger) {
-    this->log = &logger;
-}
+#include <iostream>
 
-void serial::serial::find_ports(const std::string &pattern) {
-    //DO NOT INITIALIZE THIS WILL BREAK GLOB
+serial::serial::serial(rclcpp::Logger logger) { this->log = &logger; }
+
+int serial::serial::find_ports(const std::string& pattern) {
+    // DO NOT INITIALIZE THIS WILL BREAK GLOB
     glob64_t gstruct;
 
     int result = glob64(pattern.c_str(), GLOB_ERR, NULL, &gstruct);
 
-    //Ensure we actually found a serial port
+    // Ensure we actually found a serial port
     if (result != 0) {
         if (result == GLOB_NOMATCH) {
             logger("Failed to find serial device using search pattern!", -2);
-            return;
+            return -1;
         } else {
             logger("Unknown glob error!", -2);
-            return;
+            return -2;
         }
     }
-    logger("Found ports using pattern!", 0);
 
     while (*gstruct.gl_pathv) {
         ports.push_back({*gstruct.gl_pathv, -1});
         gstruct.gl_pathv++;
     }
+    return 0;
 }
 
-std::vector<serial::port_info> serial::serial::get_ports() {
-    return this->ports;
+std::list<serial::port_info> serial::serial::get_ports() { return this->ports; }
+
+int serial::serial::connect(std::string str) {
+    int result = open(str.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
+
+    if (result < 0) {
+        logger("Error opening serial connection!", -2);
+        return -1;
+    }
+
+    // Store port file descriptor with string name
+    for (auto i : this->ports) {
+        if (strcmp(str.c_str(), i.port_name.c_str()) == 0) {
+            i.port_number = result;
+            break;
+        }
+    }
+    return result;
 }
 
-void serial::serial::connect(const std::string &str, int baud) {
+int serial::serial::configure(int port_num, long baud) {
     speed_t termios_baud;
     switch (baud) {
         case 9600:
@@ -50,65 +66,42 @@ void serial::serial::connect(const std::string &str, int baud) {
             termios_baud = B115200;
             break;
     }
-    logger("Attempting to connect to port", 0);
-
-    int result = open(str.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
-
-    if (result < 0) {
-        logger("Error connecting to the serial port!", -2);
-        return;
-    }
-
-    //Store port file descriptor with string name
-    for (auto i: this->ports) {
-        if (i.port_name == str.c_str()) {
-            i.port_number = result;
-            break;
-        }
-    }
-
-    logger("Connected to serial port!", 0);
-    configure(termios_baud, result);
-}
-
-void serial::serial::configure(speed_t baud, int port_num) {
-    //Get params from port
+    // Get params from port
     if (tcgetattr(port_num, &tty) != 0) {
         logger("Error from tcgetattr!", -2);
-        return;
+        return -1;
     }
-    //Set port parameters
+    // Set port parameters
     tty.c_cflag &= ~PARENB;
     tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag |= CS8; // 8 bits per byte (most common)
+    tty.c_cflag |= CS8;  // 8 bits per byte (most common)
     tty.c_cflag &= ~CRTSCTS;
     tty.c_cflag |= CREAD | CLOCAL;
     tty.c_lflag &= ~ICANON;
-    tty.c_lflag &= ~ECHO; // Disable echo
-    tty.c_lflag &= ~ECHOE; // Disable erasure
-    tty.c_lflag &= ~ECHONL; // Disable new-line echo
+    tty.c_lflag &= ~ECHO;    // Disable echo
+    tty.c_lflag &= ~ECHOE;   // Disable erasure
+    tty.c_lflag &= ~ECHONL;  // Disable new-line echo
     tty.c_lflag &= ~ISIG;
     tty.c_iflag &= ~(IXON | IXOFF | IXANY);
     tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
     tty.c_oflag &= ~ONLCR;
     tty.c_oflag &= ~OPOST;
 
-    //Set baud rate
-    cfsetispeed(&tty, baud);
+    // Set baud rate
+    cfsetispeed(&tty, termios_baud);
 
     if (tcsetattr(port_num, TCSANOW, &tty) != 0) {
         logger("Error from tcsetattr!", -2);
-        return;
+        return -1;
     }
-    logger("Serial port configured!", 0);
+    return 0;
 }
 
-uint32_t serial::serial::read_packet(int port_num, char *buf, int length) const {
-    uint32_t len = read(port_num, buf, length);
-    return len;
+uint32_t serial::serial::read_packet(int port_num, uint8_t* buf, uint32_t length) {
+    return read(port_num, buf, length);
 }
 
-uint32_t serial::serial::write_packet(int port_num, uint8_t *buf, int length) const {
+uint32_t serial::serial::write_packet(int port_num, uint8_t* buf, uint32_t length) {
     return write(port_num, buf, length);
 }
 
@@ -119,7 +112,7 @@ void serial::serial::close_connection(int port_num) const {
     }
 }
 
-void serial::serial::logger(const std::string &str, int severity) const {
+void serial::serial::logger(const std::string& str, int severity) const {
     if (this->log) {
         switch (severity) {
             case 1:
@@ -133,7 +126,6 @@ void serial::serial::logger(const std::string &str, int severity) const {
                 break;
             case -2:
                 RCLCPP_FATAL(*(this->log), "%s", str.c_str());
-                throw;
                 break;
             default:
                 RCLCPP_INFO(*(this->log), "%s", str.c_str());
@@ -147,4 +139,3 @@ void serial::serial::logger(const std::string &str, int severity) const {
         }
     }
 }
-
