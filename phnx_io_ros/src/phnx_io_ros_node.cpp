@@ -86,7 +86,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     RCLCPP_INFO(this->get_logger(), "Attempting to send drive message with speed: %u", drv_msg.speed);
 
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) ==
-        static_cast<uint8_t>(-1)) {
+        static_cast<uint32_t>(-1)) {
         // We failed a write so we need to check and see if fail-over is enabled
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
         //reconnect();
