@@ -6,7 +6,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     this->_port_pattern = this->declare_parameter("port_search_pattern", "/dev/ttyACM*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
     this->_max_throttle_speed = this->declare_parameter("max_throttle_speed", 2.0);
-    this->_max_brake_speed = this->declare_parameter("max_brake_speed", 2.0);
+    this->_max_brake_speed = this->declare_parameter("max_braking_speed", 2.0);
 
     // Wall timer to continuously read the current port with
     read_timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&PhnxIoRos::read_data, this));
