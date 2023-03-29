@@ -67,7 +67,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 
     // Get percentage brake and throttle and send their respective messages
     if (msg->speed < 0) {
-        auto percent_brake = static_cast<uint8_t>((abs(msg->speed) / _max_brake_speed) * 100);
+        auto percent_brake = static_cast<uint8_t>((msg->speed / _max_brake_speed) * 100);
         ser_msg.type = pir::CanMappings::SetBrake;
         ser_msg.data[0] = percent_brake;
     } else {
