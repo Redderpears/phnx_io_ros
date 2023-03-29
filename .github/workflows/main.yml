@@ -15,6 +15,6 @@ jobs:
     name: ROS ${{ matrix.ROS_DISTRO }} (${{ matrix.ROS_REPO }})
     steps:
       - uses: actions/checkout@v3
-      - run: git clone git@github.com:iscumd/robot_state_controller.git -b ros2
+      - run: git clone https://github.com/iscumd/robot_state_controller.git -b ros2
       - uses: 'ros-industrial/industrial_ci@master'
         env: ${{ matrix.env }}
