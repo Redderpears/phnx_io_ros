@@ -61,6 +61,9 @@ private:
     ///@breif Reads data of size serial::message from connected port
     void read_data();
 
+    ///@brief Closes all open serial connections
+    void close();
+
     ///@brief Handles automatically failing over to a second interface device if needed
     void reconnect();
 };

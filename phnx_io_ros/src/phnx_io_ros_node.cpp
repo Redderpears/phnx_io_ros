@@ -149,12 +149,15 @@ void pir::PhnxIoRos::reconnect() {
     }*/
 }
 
-pir::PhnxIoRos::~PhnxIoRos() {
+void pir::PhnxIoRos::close() {
     // Clean up serial connection
     for (const auto& i : port.get_ports()) {
         if (i.port_number != -1) {
-            RCLCPP_INFO(this->get_logger(), "Closing connection to: %s, fd: %d...", i.port_name.c_str(), i.port_number);
             port.close_connection(i.port_number);
         }
     }
+}
+
+pir::PhnxIoRos::~PhnxIoRos() {
+    close();
 }
