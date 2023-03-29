@@ -83,7 +83,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
         drv_msg.type = pir::CanMappings::SetThrottle;
         drv_msg.speed = percent_throttle;
     }
-    RCLCPP_INFO(this->get_logger(), "Attempting to send drive message with speed: %u", drv_msg.speed);
+    RCLCPP_INFO(this->get_logger(), "Sending drive msg with speed: %u", drv_msg.speed);
 
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) ==
         static_cast<uint32_t>(-1)) {
@@ -95,7 +95,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     // send steering angle message
     st_msg.angle = ratio(msg->steering_angle);
     st_msg.position = 0.0;
-    RCLCPP_INFO(this->get_logger(), "Sending steer msg with, Angle: %f, Position: %f", st_msg.angle, st_msg.position);
+    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f, position: %f", st_msg.angle, st_msg.position);
 
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) ==
         static_cast<uint32_t>(-1)) {
