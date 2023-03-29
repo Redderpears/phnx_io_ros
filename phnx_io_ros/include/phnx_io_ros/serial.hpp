@@ -15,13 +15,22 @@
 
 namespace serial {
 
-struct message {
+struct drive_msg {
     uint8_t type;
     uint16_t length;
-    uint8_t data[512];
+    uint8_t speed;
 } __attribute__((packed));
 
+struct steer_msg{
+    uint8_t type;
+    uint16_t length;
+    float angle;
+    float position;
+}__attribute__((packed));
+
 struct enc_msg {
+    uint8_t type;
+    uint16_t length;
     uint16_t ticks;
     float speed;
 } __attribute__((packed));

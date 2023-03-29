@@ -50,12 +50,14 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
 }
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
+    auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
+
     // Copy the newest message into last_ack and move speed field into
     // acceleration field
     ackermann_msgs::msg::AckermannDrive pub_msg;
     pub_msg.acceleration = msg->speed;
-    auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
     pub_msg.steering_angle = ratio(msg->steering_angle);
+
     if (!enc_msgs.empty()) {
         pub_msg.speed = enc_msgs.front().speed;
         enc_msgs.pop_front();
@@ -64,23 +66,26 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     }
     _odom_acks_pub->get()->publish(pub_msg);
 
-    serial::message ser_msg{};
-    ser_msg.length = 1;
+    //Create messages to send over
+    serial::drive_msg drv_msg{};
+    serial::steer_msg st_msg{};
+    st_msg.type = pir::CanMappings::SetAngle;
+    st_msg.length = 8;
+    drv_msg.length = 1;
 
     // Get percentage brake and throttle and send their respective messages
     if (msg->speed < 0) {
         auto percent_brake = static_cast<uint8_t>((msg->speed / _max_brake_speed) * 100);
-        ser_msg.type = pir::CanMappings::SetBrake;
-        ser_msg.data[0] = percent_brake;
+        drv_msg.type = pir::CanMappings::SetBrake;
+        drv_msg.speed = percent_brake;
     } else {
         auto percent_throttle = static_cast<uint8_t>((msg->speed / _max_throttle_speed) * 100);
-        ser_msg.type = pir::CanMappings::SetThrottle;
-        ser_msg.data[0] = percent_throttle;
+        drv_msg.type = pir::CanMappings::SetThrottle;
+        drv_msg.speed = percent_throttle;
     }
-    RCLCPP_INFO(this->get_logger(), "Attempting to send message with type: %u, data: %u", ser_msg.type,
-                ser_msg.data[0]);
+    RCLCPP_INFO(this->get_logger(), "Attempting to send drive message with speed: %u", drv_msg.speed);
 
-    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
+    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) ==
         static_cast<uint8_t>(-1)) {
         // We failed a write so we need to check and see if fail-over is enabled
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
@@ -88,12 +93,11 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     }
 
     // send steering angle message
-    ser_msg.type = pir::CanMappings::SetAngle;
-    ser_msg.data[0] = static_cast<uint8_t>(ratio(msg->steering_angle));
-    RCLCPP_INFO(this->get_logger(), "Attempting to send message with type: %u, data: %u", ser_msg.type,
-                ser_msg.data[0]);
+    st_msg.angle = ratio(msg->steering_angle);
+    st_msg.position = 0.0;
+    RCLCPP_INFO(this->get_logger(), "Sending steer msg with, Angle: %f, Position: %f", st_msg.angle, st_msg.position);
 
-    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
+    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) ==
         static_cast<uint32_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
         //reconnect();
