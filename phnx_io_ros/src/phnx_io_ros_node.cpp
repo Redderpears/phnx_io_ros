@@ -58,6 +58,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     pub_msg.acceleration = msg->speed;
     pub_msg.steering_angle = ratio(msg->steering_angle);
 
+    //If we've received any encoder messages from the CAN bus we grab its speed value otherwise set it to zero
     if (!enc_msgs.empty()) {
         pub_msg.speed = enc_msgs.front().speed;
         enc_msgs.pop_front();
@@ -66,25 +67,25 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     }
     _odom_acks_pub->get()->publish(pub_msg);
 
-    //Create messages to send over
+    //Steering/Drive message to send over
     serial::drive_msg drv_msg{};
     serial::steer_msg st_msg{};
-    st_msg.type = pir::CanMappings::SetAngle;
-    st_msg.length = 8;
-    drv_msg.length = 1;
 
     // Get percentage brake and throttle and send their respective messages
     if (msg->speed < 0) {
         auto percent_brake = static_cast<uint8_t>((msg->speed / _max_brake_speed) * 100);
         drv_msg.type = pir::CanMappings::SetBrake;
+        drv_msg.length = 1;
         drv_msg.speed = percent_brake;
     } else {
         auto percent_throttle = static_cast<uint8_t>((msg->speed / _max_throttle_speed) * 100);
         drv_msg.type = pir::CanMappings::SetThrottle;
+        drv_msg.length = 1;
         drv_msg.speed = percent_throttle;
     }
-    RCLCPP_INFO(this->get_logger(), "Sending drive msg with speed: %u", drv_msg.speed);
 
+    //Send a drive message to the interface device to publish onto the CAN bus
+    RCLCPP_INFO(this->get_logger(), "Sending drive msg with speed: %u", drv_msg.speed);
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) ==
         static_cast<uint32_t>(-1)) {
         // We failed a write so we need to check and see if fail-over is enabled
@@ -92,11 +93,14 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
         //reconnect();
     }
 
-    // send steering angle message
+    //Create steering message
+    st_msg.type = pir::CanMappings::SetAngle;
+    st_msg.length = 8;
     st_msg.angle = ratio(msg->steering_angle);
     st_msg.position = 0.0;
-    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f, position: %f", st_msg.angle, st_msg.position);
 
+    //Send a steering message to the interface device to publish onto the CAN bus
+    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f, position: %f", st_msg.angle, st_msg.position);
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) ==
         static_cast<uint32_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
@@ -158,6 +162,4 @@ void pir::PhnxIoRos::close() {
     }
 }
 
-pir::PhnxIoRos::~PhnxIoRos() {
-    close();
-}
+pir::PhnxIoRos::~PhnxIoRos() { close(); }
