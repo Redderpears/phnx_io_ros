@@ -24,13 +24,13 @@ int serial::serial::find_ports(const std::string& pattern) {
     }
 
     while (*gstruct.gl_pathv) {
-        ports.push_back({*gstruct.gl_pathv, -1});
+        ports.push_back({*gstruct.gl_pathv, -1,0});
         gstruct.gl_pathv++;
     }
     return 0;
 }
 
-std::list<serial::port_info> serial::serial::get_ports() { return this->ports; }
+std::list<serial::port_info> serial::serial::get_devices() { return this->ports; }
 
 int serial::serial::connect(std::string str) {
     int result = open(str.c_str(), O_RDWR | O_NOCTTY | O_SYNC);

@@ -4,10 +4,11 @@
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", options) {
-    this->_port_pattern = this->declare_parameter("port_search_pattern", "/dev/ttyACM*");
+    this->_port_pattern =
+        this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
     this->_max_throttle_speed = this->declare_parameter("max_throttle_speed", 2.0);
-    this->_max_brake_speed = this->declare_parameter("max_braking_speed", 2.0);
+    this->_max_brake_speed = this->declare_parameter("max_braking_speed", -2.0);
 
     // Wall timer to continuously read the current port with
     read_timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&PhnxIoRos::read_data, this));
@@ -28,7 +29,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     RCLCPP_INFO(this->get_logger(), "Found serial devices!");
 
     //Connect every port that we found with the specific pattern
-    for (auto i : port.get_ports()) {
+    for (auto i : port.get_devices()) {
         i.port_number = port.connect(i.port_name);
         while (i.port_number == -1) {
             RCLCPP_ERROR(this->get_logger(), "Failed to connect to serial port!, Retrying...");
@@ -41,7 +42,9 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
             rclcpp::sleep_for(std::chrono::milliseconds(500));
         }
         RCLCPP_INFO(this->get_logger(), "Configured serial port!");
-        //if the port we just connected on successfully connected then enter that fd as the current device number to use
+        // If the port we just attempted a connection on successfully connected then enter that FD as the device number
+        // to use.
+        // This will always make the first found/connected device the device to use for reading/writing
         if (i.port_number != -1 && current_device == -1) {
             current_device = i.port_number;
             RCLCPP_INFO(this->get_logger(), "Set current device to device: %s, %d", i.port_name.c_str(), i.port_number);
@@ -93,13 +96,13 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
         //reconnect();
     }
 
-    //Create steering message
+    // Create a steering message
     st_msg.type = pir::CanMappings::SetAngle;
     st_msg.length = 8;
     st_msg.angle = ratio(msg->steering_angle);
     st_msg.position = 0.0;
 
-    //Send a steering message to the interface device to publish onto the CAN bus
+    // Send a steering message to the interface device to publish onto the CAN bus
     RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f, position: %f", st_msg.angle, st_msg.position);
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) ==
         static_cast<uint32_t>(-1)) {
@@ -141,7 +144,6 @@ void pir::PhnxIoRos::read_data() {
 
 void pir::PhnxIoRos::reconnect() {
     //TODO: Implement reconnect
-    //Attempt to reconnect to another device on write/read failure
 
     /*if (fail_over_enabled) {
         //Fail-over is available so attempt to find another teensy device connected to the computer to use
@@ -155,7 +157,7 @@ void pir::PhnxIoRos::reconnect() {
 
 void pir::PhnxIoRos::close() {
     // Clean up serial connection
-    for (const auto& i : port.get_ports()) {
+    for (const auto& i : port.get_devices()) {
         if (i.port_number != -1) {
             port.close_connection(i.port_number);
         }

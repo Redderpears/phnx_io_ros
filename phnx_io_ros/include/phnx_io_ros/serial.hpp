@@ -36,10 +36,13 @@ struct enc_msg {
 } __attribute__((packed));
 
 /// Contains the name of the serial port file and the file descriptor of the
-/// port, if device on port not connected then port_number will be -1
+/// port, if device on port not connected then port_number will be -1. Failures indicate number of io op's
+/// on that device that have failed. Too many failures should be interpreted as a permanent failure and a different
+/// device should be used, failing that a system shutdown may be required
 struct port_info {
     std::string port_name;
     int port_number;
+    int failures;
 };
 
 class serial {
@@ -80,8 +83,8 @@ public:
     /// Get the list of found serial ports, port number will be -1 if port is not
     /// connected
     ///@return Returns a list of port info structs containing string filename of
-    ///the port and file descriptor used by termios
-    std::list<port_info> get_ports();
+    ///the port, file descriptor used by unix, and number of I/O failures that device has had
+    std::list<port_info> get_devices();
 
     /// Read data from a connected serial port
     ///@param buf buffer to store read data in

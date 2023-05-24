@@ -43,8 +43,9 @@ private:
     std::list<serial::enc_msg> enc_msgs;
     uint8_t read_buf{};
     long _baud_rate{};
-    //File descriptor number of device were using, used to determine what device to write/read to
+    //File descriptor number of a device were using, used to determine what device to write/read to
     int current_device{-1};
+    int FAILURE_TOLERANCE{5};
 
     // Kart control params
     double _max_throttle_speed{};
