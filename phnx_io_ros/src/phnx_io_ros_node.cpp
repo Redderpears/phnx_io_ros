@@ -3,6 +3,10 @@
 #include "libackermann/libackermann.hpp"
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
+#define MAX_BUF_LEN 2304000
+#define PKG_HEADER 0x54
+
+
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", options) {
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
@@ -10,46 +14,44 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     this->_max_throttle_speed = this->declare_parameter("max_throttle_speed", 2.0);
     this->_max_brake_speed = this->declare_parameter("max_braking_speed", -2.0);
 
-    // Wall timer to continuously read the current port with
-    read_timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&PhnxIoRos::read_data, this));
-
     _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
         "/robot/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
 
-    port = serial::serial(this->get_logger());
-
-    // Find ports connected with the specified pattern
-    while (port.find_ports(_port_pattern) != 0) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to find ports with specified search string... %s",
-                     this->_port_pattern.c_str());
+    while(find_devices() != 0){
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
-    RCLCPP_INFO(this->get_logger(), "Found serial devices!");
 
-    //Connect every port that we found with the specific pattern
-    for (auto i : port.get_devices()) {
-        i.port_number = port.connect(i.port_name);
-        while (i.port_number == -1) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to connect to serial port!, Retrying...");
-            rclcpp::sleep_for(std::chrono::milliseconds(500));
-            i.port_number = port.connect(i.port_name);
-        }
-        RCLCPP_INFO(this->get_logger(), "Connected to serial port!");
-        while (port.configure(i.port_number, this->_baud_rate) == -1) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to configure serial port!, Retrying...");
-            rclcpp::sleep_for(std::chrono::milliseconds(500));
-        }
-        RCLCPP_INFO(this->get_logger(), "Configured serial port!");
-        // If the port we just attempted a connection on successfully connected then enter that FD as the device number
-        // to use.
-        // This will always make the first found/connected device the device to use for reading/writing
-        if (i.port_number != -1 && current_device == -1) {
-            current_device = i.port_number;
-            RCLCPP_INFO(this->get_logger(), "Set current device to device: %s, %d", i.port_name.c_str(), i.port_number);
+    // Create serial handler for this device
+    cur_device.handler = new serial::serial(this->get_logger());
+
+    while(cur_device.handler->open_connection(cur_device.port_name, this->_baud_rate) != 0){
+        RCLCPP_ERROR(this->get_logger(), "Error opening device!");
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
+    }
+}
+
+int pir::PhnxIoRos::find_devices() {
+    // DO NOT INITIALIZE THIS WILL BREAK GLOB
+    glob64_t gstruct;
+
+    int result = glob64(_port_pattern.c_str(), GLOB_ERR, NULL, &gstruct);
+
+    // Ensure we actually found a serial port
+    if (result != 0) {
+        if (result == GLOB_NOMATCH) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to find serial device using search pattern!");
+            return -1;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Unknown glob error!");
+            return -1;
         }
     }
+
+    // Set first found device as our current device
+    this->cur_device.port_name = *gstruct.gl_pathv;
+    return 0;
 }
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
@@ -61,7 +63,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     pub_msg.acceleration = msg->speed;
     pub_msg.steering_angle = ratio(msg->steering_angle);
 
-    //If we've received any encoder messages from the CAN bus we grab its speed value otherwise set it to zero
+    // If we've received any encoder messages from the CAN bus, we grab its speed value otherwise set it to zero
     if (!enc_msgs.empty()) {
         pub_msg.speed = enc_msgs.front().speed;
         enc_msgs.pop_front();
@@ -70,7 +72,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     }
     _odom_acks_pub->get()->publish(pub_msg);
 
-    //Steering/Drive message to send over
+    // Steering/Drive message to send over
     serial::drive_msg drv_msg{};
     serial::steer_msg st_msg{};
 
@@ -78,22 +80,18 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     if (msg->speed < 0) {
         auto percent_brake = static_cast<uint8_t>((msg->speed / _max_brake_speed) * 100);
         drv_msg.type = pir::CanMappings::SetBrake;
-        drv_msg.length = 1;
         drv_msg.speed = percent_brake;
     } else {
         auto percent_throttle = static_cast<uint8_t>((msg->speed / _max_throttle_speed) * 100);
         drv_msg.type = pir::CanMappings::SetThrottle;
-        drv_msg.length = 1;
         drv_msg.speed = percent_throttle;
     }
+    drv_msg.length = 1;
 
-    //Send a drive message to the interface device to publish onto the CAN bus
+    // Send a drive message to the interface device to publish onto the CAN bus
     RCLCPP_INFO(this->get_logger(), "Sending drive msg with speed: %u", drv_msg.speed);
-    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) ==
-        static_cast<uint32_t>(-1)) {
-        // We failed a write so we need to check and see if fail-over is enabled
-        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
-        //reconnect();
+    if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) == -1) {
+        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device: %s with fd: %d", cur_device.port_name.c_str(), cur_device.handler->get_fd());
     }
 
     // Create a steering message
@@ -104,63 +102,19 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 
     // Send a steering message to the interface device to publish onto the CAN bus
     RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f, position: %f", st_msg.angle, st_msg.position);
-    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) ==
-        static_cast<uint32_t>(-1)) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
-        //reconnect();
+    if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) == -1) {
+        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device: %s with fd: %d", cur_device.port_name.c_str(), cur_device.handler->get_fd());
     }
 }
 
 void pir::PhnxIoRos::read_data() {
-    //TODO: Fix reading
-    /*RCLCPP_INFO(this->get_logger(), "Attempting to read from port!");
-    uint32_t bytes_read = serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message));
-    if (bytes_read == static_cast<uint32_t>(-1)) {
-        RCLCPP_ERROR(this->get_logger(), "%u, Failed to read message from teensy device using fd: %d", bytes_read,
-                     current_device);
-    } else if (bytes_read > 0 && bytes_read < sizeof(serial::message)) {
-        RCLCPP_INFO(this->get_logger(), "Successfully read from port!");
-        auto* msg = reinterpret_cast<serial::message*>(&read_buf);
-        RCLCPP_INFO(this->get_logger(), "Message Recieved: Type: %u, Length: %u, Data: %u, %u, %u, %u, %u, %u, %u, %u",
-                    msg->type, msg->length, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4],
-                    msg->data[5], msg->data[6], msg->data[7]);
-        switch (msg->type) {
-            case CanMappings::KillAuton:
-                RCLCPP_WARN(this->get_logger(), "Received auton_kill message!");
-                request->state.state = robot_state_msgs::msg::State::KILL;
-                _robot_state_client->async_send_request(request);
-                break;
-            case CanMappings::EncoderTick:
-                RCLCPP_INFO(this->get_logger(), "Received encoder message!");
-                if (enc_msgs.size() > 15) {
-                    enc_msgs.clear();
-                }
-                //Convert generic message's data field into ticks and speed values
-                enc_msgs.push_back(*(reinterpret_cast<serial::enc_msg*>(*msg->data)));
-                break;
-        }
-    }*/
-}
-
-void pir::PhnxIoRos::reconnect() {
-    //TODO: Implement reconnect
-
-    /*if (fail_over_enabled) {
-        //Fail-over is available so attempt to find another teensy device connected to the computer to use
-        used_ports.push_back(current_device);
-    } else {
-        RCLCPP_FATAL(this->get_logger(), "We've lost connection to the Teensy device!");
-        request->state.state = robot_state_msgs::msg::State::KILL;
-        _robot_state_client->async_send_request(request);
-    }*/
+    //TODO: Reading
 }
 
 void pir::PhnxIoRos::close() {
     // Clean up serial connection
-    for (const auto& i : port.get_devices()) {
-        if (i.port_number != -1) {
-            port.close_connection(i.port_number);
-        }
+    if(cur_device.handler->connected()){
+        cur_device.handler->close_connection();
     }
 }
 

@@ -6,6 +6,7 @@
 #include "rclcpp/logger.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "robot_state_msgs/srv/set_state.hpp"
+#include <glob.h>
 
 namespace pir {
 
@@ -18,6 +19,12 @@ enum CanMappings {
     SetThrottle = 0x6,
     EncoderTick = 0x7,
     TrainingMode = 0x8,
+};
+
+///Contains the device name as well as the serial object that acts as that device's handler for IO
+struct device_info {
+    std::string port_name;
+    serial::serial *handler;
 };
 
 class PhnxIoRos : public rclcpp::Node {
@@ -34,17 +41,14 @@ private:
 
     rclcpp::Client<robot_state_msgs::srv::SetState>::SharedPtr _robot_state_client;
 
-    rclcpp::TimerBase::SharedPtr read_timer_;
-
     // Serial port params
-    serial::serial port;
     std::string _port_pattern{};
-    std::vector<int> used_ports{};
     std::list<serial::enc_msg> enc_msgs;
-    uint8_t read_buf{};
+    uint8_t *read_buf;
     long _baud_rate{};
+    std::vector<uint8_t> mDataTmp;
     //File descriptor number of a device were using, used to determine what device to write/read to
-    int current_device{-1};
+    device_info cur_device;
     int FAILURE_TOLERANCE{5};
 
     // Kart control params
@@ -62,11 +66,11 @@ private:
     ///@breif Reads data of size serial::message from connected port
     void read_data();
 
-    ///@brief Closes all open serial connections
+    ///@brief Closes open serial connection
     void close();
 
-    ///@brief Handles automatically failing over to a second interface device if needed
-    void reconnect();
+    ///@brief Attempts to find devices given a certain pattern.
+    int find_devices();
 };
 
 }  // namespace pir
