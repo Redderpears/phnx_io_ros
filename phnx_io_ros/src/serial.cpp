@@ -1,8 +1,13 @@
 #include "phnx_io_ros/serial.hpp"
 
-#include <iostream>
+#include <utility>
 
-serial::serial::serial(rclcpp::Logger logger) { this->log = &logger; }
+#define PCK_HEADER 0x54
+
+serial::serial::serial(rclcpp::Logger logger, std::function<void(message)> callback) {
+    this->log = &logger;
+    this->msgCallback = std::move(callback);
+}
 
 int serial::serial::get_fd() const { return this->fd; }
 
@@ -69,37 +74,69 @@ void serial::serial::read_process(void* param) {
     auto* s = (serial*)param;
     char* read_buf = new char[sizeof(message) + 1];
 
-    if (s->fd != -1) {
+    if (s->is_connected) {
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(s->fd, &readfds);
 
         while (!s->read_exit_flag.load()) {
+            //Wait on the fd until there is data to read
             int r = pselect(s->fd + 1, &readfds, NULL, NULL, NULL, NULL);
             if (r < 0) {
                 if (errno == EINTR) {
-                    // Select interrupted
-                    //s->logger("Select interrupted!", -1);
-                    continue;
+                    std::printf("Select interrupted!");
+                    break;
                 }
             } else if (r == 0) {
                 // Timeout occurred
-                //s->logger("Timeout occurred!", -1);
-                continue;
+                std::printf("Timeout occurred!");
+                break;
             } else if (FD_ISSET(s->fd, &readfds)) {
                 //Data is available to be read
                 int l = (int32_t)read(s->fd, (uint8_t*)read_buf, sizeof(message));
-                if(l < 0){
-                    //s->logger("Reading error!", -1);
-                }
-                else{
-                    //std::string str = "Read " + std::to_string(l) + " bytes!";
-                    //s->logger("Read bytes!", 0);
+                if (l < 0) {
+                    std::printf("Reading error!");
+                } else {
+                    s->process_packet(read_buf, l);
                 }
             }
         }
     }
     delete[] read_buf;
+}
+
+void serial::serial::process_packet(char* buf, int len) {
+    tempData.clear();
+    message m{};
+
+    //Dump raw data into a vector buffer
+    for (int i = 0; i < len; i++) {
+        tempData.push_back((uint8_t)*buf++);
+    }
+
+    int start = 0;
+    while (start < (int)tempData.size()) {
+        if (tempData.at(start) == PCK_HEADER) {
+            m.header = tempData.at(start);
+            m.type = tempData.at(start + 1);
+            m.length = ((uint16_t)tempData.at(start + 3) << 8) | tempData.at(start + 2);
+
+            //Increment 4 bytes down from header to begin reading from data section of packet
+            start += 4;
+
+            int j = 0;
+            while (start < (int)tempData.size()) {
+                m.data[j] = tempData.at(start);
+                j++;
+                start++;
+            }
+            break;
+        }
+        start++;
+    }
+
+    //Send our complete packet to our callback function for further processing
+    msgCallback(m);
 }
 
 int32_t serial::serial::write_packet(uint8_t* buf, uint32_t length) const {

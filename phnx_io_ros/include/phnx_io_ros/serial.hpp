@@ -39,7 +39,7 @@ struct enc_msg {
 struct message {
     uint8_t header;
     uint8_t type;
-    uint8_t length;
+    uint16_t length;
     uint8_t data[512];
 };
 
@@ -51,6 +51,8 @@ private:
     std::atomic<bool> read_exit_flag{false};
     std::thread* readThr{nullptr};
     bool is_connected{false};
+    std::vector<uint8_t> tempData;
+    std::function<void(message)> msgCallback;
 
     /// Logs with either RCLCPP logs or normal stdout/stderr
     ///@param str string to write to the log
@@ -59,9 +61,7 @@ private:
     void logger(const std::string& str, int severity) const;
 
 public:
-    //serial() = default;
-
-    explicit serial(rclcpp::Logger log);
+    explicit serial(rclcpp::Logger log, std::function<void(message)> callback);
 
     ///Opens and configures a serial port
     ///@param port_name string name of file descriptor
@@ -90,5 +90,10 @@ public:
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes written, -1 returned on error
     int32_t write_packet(uint8_t* buf, uint32_t length) const;
+
+    /// Processes raw byte stream into messages
+    ///@param buf raw buffer from read call
+    ///@param len number of bytes read as returned by read call
+    void process_packet(char* buf, int len);
 };
 }  // namespace serial

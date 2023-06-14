@@ -21,7 +21,8 @@ enum CanMappings {
     TrainingMode = 0x8,
 };
 
-///Contains the device name as well as the serial object that acts as that device's handler for IO
+/// Contains the device name as well as the serial object that acts as that device's handler for IO
+/// This allows for multiple connected teensy devices to be handled in the future.
 struct device_info {
     std::string port_name;
     serial::serial *handler;
@@ -30,6 +31,9 @@ struct device_info {
 class PhnxIoRos : public rclcpp::Node {
 public:
     explicit PhnxIoRos(rclcpp::NodeOptions options);
+
+    ///@breif Reads data of size serial::message from connected port
+    void read_data(serial::message m);
 
     ~PhnxIoRos() override;
 
@@ -44,10 +48,7 @@ private:
     // Serial port params
     std::string _port_pattern{};
     std::list<serial::enc_msg> enc_msgs;
-    uint8_t *read_buf;
     long _baud_rate{};
-    std::vector<uint8_t> mDataTmp;
-    //File descriptor number of a device were using, used to determine what device to write/read to
     device_info cur_device;
     int FAILURE_TOLERANCE{5};
 
@@ -62,9 +63,6 @@ private:
     /// CAN bus
     ///@param msg Ackermann drive message to convert
     void send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg);
-
-    ///@breif Reads data of size serial::message from connected port
-    void read_data();
 
     ///@brief Closes open serial connection
     void close();
