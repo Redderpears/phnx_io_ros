@@ -119,6 +119,7 @@ void serial::serial::process_packet(char* buf, int len) {
         if (tempData.at(start) == PCK_HEADER) {
             m.header = tempData.at(start);
             m.type = tempData.at(start + 1);
+            //Convert the two bytes after the type byte to one uint16_t
             m.length = ((uint16_t)tempData.at(start + 3) << 8) | tempData.at(start + 2);
 
             //Increment 4 bytes down from header to begin reading from data section of packet

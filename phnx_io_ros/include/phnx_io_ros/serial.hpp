@@ -30,8 +30,6 @@ struct steer_msg {
 } __attribute__((packed));
 
 struct enc_msg {
-    uint8_t type;
-    uint16_t length;
     uint16_t ticks;
     float speed;
 } __attribute__((packed));

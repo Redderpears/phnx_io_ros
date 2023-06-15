@@ -3,9 +3,6 @@
 #include "libackermann/libackermann.hpp"
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
-#define MAX_BUF_LEN 2304000
-#define PKG_HEADER 0x54
-
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", options) {
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
@@ -114,10 +111,29 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 }
 
 void pir::PhnxIoRos::read_data(serial::message m) {
-    //TODO: Reading
+    auto kill = std::make_shared<robot_state_msgs::srv::SetState::Request>();
+    serial::enc_msg* msg;
     RCLCPP_INFO(this->get_logger(), "Received message:\n Type: %u\n Length: %u\n Data: \n", m.type, m.length);
     for (int i = 0; i < m.length; i++) {
         RCLCPP_INFO(this->get_logger(), "%u", m.data[i]);
+    }
+
+    // If we receive an auton kill message, we send a service request to drive mode switch to switch the kart to a killed state
+    // If we receive an encoder tick, we add it to our vector to be used when the next control message arrives
+    switch (m.type) {
+        case CanMappings::KillAuton:
+            RCLCPP_WARN(this->get_logger(), "Auton kill signal received!");
+            kill->state.state = robot_state_msgs::msg::State::KILL;
+            this->_robot_state_client->async_send_request(kill);
+            break;
+        case CanMappings::EncoderTick:
+            msg = reinterpret_cast<serial::enc_msg*>(m.data);
+            enc_msgs.push_back(*msg);
+            RCLCPP_INFO(this->get_logger(), "Received encoder tick!");
+            break;
+        default:
+            RCLCPP_INFO(this->get_logger(), "Received non encoder tick/auton kill message!");
+            break;
     }
 }
 

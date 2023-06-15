@@ -17,13 +17,32 @@ either our simulation environment or the physical kart.
 This package allows the ROS aspect of phoenix to interface with the CAN bus that will run the physical karts
 drive-by-wire
 system and receive CAN messages to translate to speed values. This package will also be responsible for controlling the
-karts state based on CAN bus status.
+kart state based on CAN bus status.
 
-### TODO: Rest of phnx_io_ros doc
+### Topics
+
+#### Publishes
+- `/odom_ack` : AckermannDrive message that contains the current steering angle received on the topic `/robot/cmd_vel`
+as well as the current throttle/brake value which will be stored in the resulting messages acceleration field.
+The speed field of the AckermannDrive message contains the last received speed message from the CAN bus.
+If no speed messages have been received, then the speed field will be zero.
+
+#### Subscribes
+- `/robot/ack_vel`: AckermannDrive messages coming from the controller that contain steering angle and throttle/brake
+values to be sent to the CAN bus.
+
+### Params
+- `port_search_pattern`: The string pattern to look for when looking for a teensy device. This can be either a top level
+`/dev/ttyACM*` or the serial devices id as found in `/dev/serial/by-id`.
+  By default, phnx_io_ros will use `/dev/serial/by-id/usb-Teensyduino_USB_Serial*` which should point to a Teensy serial monitor
+  if plugged in.
+- `baud_rate`: Baud rate to use when connecting to a Teensy.
+- `max_throttle_speed`: Value that we consider to be full throttle. It Should be consistent with controller.
+- `max_braking_speed`: Value that we consider to be full brake. It Should be consistent with controller.
 
 ### gz_io_ros
 
-This package acts as a fake for phnx_io_ros and allows the ROS aspect of Phoenix to interface with Ignition Gazebo which
+This package acts as a fake for phnx_io_ros and allows the ROS aspect of Phoenix to interface with Ignition Gazebo, which
 runs our simulation environment. This packages primary function is to take in odom coming from the simulation and twist
 values from ROS and convert those into AckermannDrive messages to be logged
 with '[data_logger](https://github.com/ISC-Project-Phoenix/data_logger)'
@@ -33,7 +52,7 @@ with '[data_logger](https://github.com/ISC-Project-Phoenix/data_logger)'
 #### Publishes
 
 - `/odom_ack`: AckermannDrive messages that contain the current steering, speed and throttle/brake percentage. Steering
-  values and speed are stored in their respective fields, however the acceleration field store either the current
+  values and speed are stored in their respective fields; however, the acceleration field stores either the current
   braking
   percentage or current throttle percentage depending on the received twist message. Note that
   the `steering_angle_velocity`
@@ -46,7 +65,7 @@ with '[data_logger](https://github.com/ISC-Project-Phoenix/data_logger)'
 
 ### Params
 
-- `wheel_base`: Wheelbase of the kart, should match both sim and real life
+- `wheel_base`: Wheelbase of the kart, it should match both sim and real life
 
 ### Misc
 

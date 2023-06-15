@@ -16,6 +16,7 @@ enum CanMappings {
     LockBrake = 0x2,
     UnlockBrake = 0x3,
     SetAngle = 0x4,
+    GetAngle = 0x5,
     SetThrottle = 0x6,
     EncoderTick = 0x7,
     TrainingMode = 0x8,
