@@ -6,7 +6,7 @@
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", options) {
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
-    this->_baud_rate = this->declare_parameter("baud_rate", 9600);
+    this->_baud_rate = this->declare_parameter("baud_rate", 115200);
     this->_max_throttle_speed = this->declare_parameter("max_throttle_speed", 2.0);
     this->_max_brake_speed = this->declare_parameter("max_braking_speed", -2.0);
 
