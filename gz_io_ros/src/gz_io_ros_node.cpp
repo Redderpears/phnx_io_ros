@@ -11,7 +11,6 @@ gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) 
     _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
 
     // gazebo
-    _steering_pub = this->create_publisher<std_msgs::msg::Float64>("/robot/steering_angle", 10);
     _drive_pub = this->create_publisher<geometry_msgs::msg::Twist>("/robot/cmd_vel", 10);
 
     // inputs
@@ -51,12 +50,12 @@ void gir::GzIoRos::ack_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr ack) {
     // Because odom is constant in sim, we can just store the last steering value as a known state, rather than queuing
     this->last_msg = *ack;
 
-    // Move steering in gazebo
-    std_msgs::msg::Float64 steering_angle{};
-    steering_angle.data = ack->steering_angle;
-    this->_steering_pub->publish(steering_angle);
+    // Convert ackermann to twist for gazebo
+    AckermannCommand nack {ack->speed, ack->steering_angle};
+    auto twist = ack::ackermann_to_twist(nack, static_cast<float>(this->_wheelbase));
 
     geometry_msgs::msg::Twist drive{};
-    drive.linear.x = ack->speed;
+    drive.linear.x = twist.v_linear_x;
+    drive.angular.z = twist.v_angular_yaw;
     this->_drive_pub->publish(drive);
 }
