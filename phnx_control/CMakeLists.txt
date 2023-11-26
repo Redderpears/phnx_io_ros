@@ -18,13 +18,17 @@ target_include_directories(phnx_control PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_compile_features(phnx_control PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+set(deps
+        rclcpp
+        geometry_msgs
+        ackermann_msgs
+        nav_msgs
+        control_toolbox
+)
+
 ament_target_dependencies(
-        phnx_control
-        "rclcpp"
-        "geometry_msgs"
-        "ackermann_msgs"
-        "nav_msgs"
-        "control_toolbox"
+        phnx_control ${deps}
 )
 
 install(TARGETS
@@ -33,6 +37,11 @@ install(TARGETS
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin
+)
+
+install(
+        DIRECTORY include/
+        DESTINATION include/
 )
 
 if (BUILD_TESTING)
@@ -47,13 +56,8 @@ if (BUILD_TESTING)
     ament_lint_auto_find_test_dependencies()
 endif ()
 
-ament_export_include_directories(
-        include
-)
-ament_export_libraries(
-        phnx_control
-)
 ament_export_targets(
-        export_${PROJECT_NAME}
+        export_${PROJECT_NAME} HAS_LIBRARY_TARGET
 )
+ament_export_dependencies(${deps})
 ament_package()

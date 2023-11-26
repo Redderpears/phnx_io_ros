@@ -2,6 +2,7 @@
 
 #include "ackermann_msgs/msg/ackermann_drive.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "phnx_control/speed_control.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "webots/vehicle/driver.h"
@@ -19,8 +20,9 @@ private:
 
     rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>::SharedPtr ack_sub;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub;
-    ackermann_msgs::msg::AckermannDrive control;
     webots_ros2_driver::WebotsNode* parent;
+
+    phnx_control::SpeedController controller{};
 
     ~WbIoRos() { wbu_driver_cleanup(); }
 };

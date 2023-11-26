@@ -13,6 +13,7 @@ find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(webots_ros2_driver REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(phnx_control REQUIRED)
 
 # Export the plugin configuration file
 pluginlib_export_plugin_description_file(webots_ros2_driver wb_io_ros.xml)
@@ -30,6 +31,7 @@ ament_target_dependencies(
         "ackermann_msgs"
         "pluginlib"
         "nav_msgs"
+        "phnx_control"
 )
 
 install(TARGETS

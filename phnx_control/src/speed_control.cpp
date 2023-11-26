@@ -4,12 +4,17 @@ namespace phnx_control {
 
 SpeedController::SpeedController() {
     // TODO use real values
-    this->throttle_pid.initPid(1, 1, 0, 2, -1);
-    this->brake_pid.initPid(1, 1, 0, 2, -1);
+    this->throttle_pid.initPid(0.2, 0.1, 0, 1, -1);
+    this->brake_pid.initPid(0.2, 0.1, 0, 1, -1);
 }
 
 std::tuple<double, SpeedController::Actuator> SpeedController::update(double speed, const rclcpp::Time& stamp) {
-    auto dt = stamp - this->last_feedback;
+    uint64_t dt;
+    if (!this->last_feedback.has_value()) {
+        dt = 0;
+    } else {
+        dt = (stamp - *this->last_feedback).nanoseconds();
+    }
     this->last_feedback = stamp;
 
     double error = this->set_speed - speed;
@@ -21,7 +26,7 @@ std::tuple<double, SpeedController::Actuator> SpeedController::update(double spe
         }
 
         // TODO make command in 0-1 (I assume this is implicit in gains?)
-        double command = this->brake_pid.computeCommand(error, dt.nanoseconds());
+        double command = this->brake_pid.computeCommand(error, dt);
         return std::make_tuple(command, Actuator::Brake);
     }
     // Else, use throttle some amount
@@ -30,7 +35,14 @@ std::tuple<double, SpeedController::Actuator> SpeedController::update(double spe
             this->disable_breaks();
         }
 
-        double command = this->throttle_pid.computeCommand(error, dt.nanoseconds());
+        double command = this->throttle_pid.computeCommand(error, dt);
+
+        // Negative throttle values mean we should slow, but because we are on this path we have not used the brakes.
+        // This means we should coast.
+        if (command < 0) {
+            command = 0;
+        }
+
         return std::make_tuple(command, Actuator::Throttle);
     }
 }

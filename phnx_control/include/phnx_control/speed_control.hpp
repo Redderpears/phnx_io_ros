@@ -13,7 +13,7 @@ private:
     control_toolbox::Pid throttle_pid;
     control_toolbox::Pid brake_pid;
     /// Stamp of the last feedback
-    rclcpp::Time last_feedback;
+    std::optional<rclcpp::Time> last_feedback;
     /// Flag indicating if the brake is set
     bool brake_active = false;
     /// Speed we want to reach

@@ -5,6 +5,7 @@
 namespace wb_io_ros {
 void WbIoRos::init(webots_ros2_driver::WebotsNode* node, std::unordered_map<std::string, std::string>& parameters) {
     wbu_driver_init();
+    wbu_driver_set_gear(1);
 
     // Store owning node
     this->parent = node;
@@ -14,7 +15,11 @@ void WbIoRos::init(webots_ros2_driver::WebotsNode* node, std::unordered_map<std:
     odom_pub = node->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
 }
 
-void WbIoRos::ack_cb(const ackermann_msgs::msg::AckermannDrive::SharedPtr msg) { this->control = *msg; }
+void WbIoRos::ack_cb(const ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
+    this->controller.update_set_speed(msg->speed);
+    // Set steering directly, as with the real bot
+    wbu_driver_set_steering_angle(-msg->steering_angle);
+}
 
 void WbIoRos::step() {
     wbu_driver_step();
@@ -32,9 +37,19 @@ void WbIoRos::step() {
         RCLCPP_INFO(parent->get_logger(), "Skipping nan encoder value");
     }
 
-    // Actuate the car, converting from ros units
-    wbu_driver_set_cruising_speed(this->control.speed * 3.6);
-    wbu_driver_set_steering_angle(-this->control.steering_angle);
+    // Update control loop
+    auto [perc, actuator] = this->controller.update(odom.twist.twist.linear.x, odom.header.stamp);
+
+    // Actuate correct component in sim
+    if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
+        RCLCPP_INFO(parent->get_logger(), "setting throttle to: %f", perc);
+        wbu_driver_set_brake_intensity(0.0);
+        wbu_driver_set_throttle(perc);
+    } else {
+        RCLCPP_INFO(parent->get_logger(), "setting brake to: %f", perc);
+        wbu_driver_set_throttle(0.0);
+        wbu_driver_set_brake_intensity(perc);
+    }
 }
 }  // namespace wb_io_ros
 
