@@ -24,6 +24,8 @@ void WbIoRos::step() {
     odom.header.stamp = parent->get_clock()->now();
     // Convert from kph to mps
     odom.twist.twist.linear.x = wbu_driver_get_current_speed() / 7.2;
+    odom.twist.covariance.at(0) = 0.1;
+    odom.twist.covariance.at(7) = 0.1;
 
     // Sometimes we get nans, remove them here else it breaks the ekf
     if (!std::isnan(odom.twist.twist.linear.x)) {
