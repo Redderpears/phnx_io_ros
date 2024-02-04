@@ -24,6 +24,9 @@ private:
 
     phnx_control::SpeedController controller{};
 
+    bool use_control;
+    ackermann_msgs::msg::AckermannDrive command{};
+
     ~WbIoRos() { wbu_driver_cleanup(); }
 };
 }  // namespace wb_io_ros
