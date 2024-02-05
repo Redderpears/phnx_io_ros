@@ -14,24 +14,19 @@ either our simulation environment or the physical kart.
 
 ### phnx_io_ros
 
-This package allows the ROS aspect of phoenix to interface with the CAN bus that will run the physical karts
-drive-by-wire
-system and receive CAN messages to translate to speed values. This package will also be responsible for controlling the
-kart state based on CAN bus status.
+Interface between ROS and the CAN bus. Handles receiving sensor data and also processing commands to control actuators.
 
 ### Topics
 
 #### Publishes
 
-- `/odom_ack` : AckermannDrive message that contains the current steering angle received on the topic `/robot/cmd_vel`
-  as well as the current throttle/brake value which will be stored in the resulting messages acceleration field.
-  The speed field of the AckermannDrive message contains the last received speed message from the CAN bus.
-  If no speed messages have been received, then the speed field will be zero.
+- `/odom_can` : Odom messages containing data from the CAN bus.
 
 #### Subscribes
 
-- `/robot/ack_vel`: AckermannDrive messages coming from the controller that contain steering angle and throttle/brake
-  values to be sent to the CAN bus.
+- `/robot/ack_vel`: AckermannDrive commands to control vehicle. These are passed through a PID loop and then sent to the
+  CAN bus.
+- `/odom`: Filtered odom values to provide better feedback to the PID loop.
 
 ### Params
 
@@ -39,10 +34,8 @@ kart state based on CAN bus status.
   `/dev/ttyACM*` or the serial devices id as found in `/dev/serial/by-id`.
   By default, phnx_io_ros will use `/dev/serial/by-id/usb-Teensyduino_USB_Serial*` which should point to a Teensy serial
   monitor
-  if plugged in.
+  if plugged in. This can be by USB, or UART.
 - `baud_rate`: Baud rate to use when connecting to a Teensy.
-- `max_throttle_speed`: Value that we consider to be full throttle. It Should be consistent with controller.
-- `max_braking_speed`: Value that we consider to be full brake. It Should be consistent with controller.
 
 ### gz_io_ros
 

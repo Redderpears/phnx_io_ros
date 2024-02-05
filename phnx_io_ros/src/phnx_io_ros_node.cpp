@@ -7,14 +7,15 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
-    this->_max_throttle_speed = this->declare_parameter("max_throttle_speed", 2.0);
-    this->_max_brake_speed = this->declare_parameter("max_braking_speed", -2.0);
 
-    _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
+    _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
         "/robot/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
+    _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
 
+    // Find connected interface ECU connected to a USB port
     while (find_devices() != 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
@@ -24,13 +25,22 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
         read_data(std::forward<decltype(PH1)>(PH1));
     };
 
-    // Create serial handler for this device
+    // Start CAN read thread
     cur_device.handler = new serial::serial(this->get_logger(), read_callback);
 
     while (cur_device.handler->open_connection(cur_device.port_name, this->_baud_rate) != 0) {
         RCLCPP_ERROR(this->get_logger(), "Error opening device!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
+
+    // Start pid thread
+    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1));
+
+    /* Now we have three threads:
+     * 1) Main node thread subs and pubs
+     * 2) CAN read thread
+     * 3) PID control thread, which writes to CAN
+     */
 }
 
 int pir::PhnxIoRos::find_devices() {
@@ -56,60 +66,25 @@ int pir::PhnxIoRos::find_devices() {
 }
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
+    // Send speed command to PID
+    this->pid->set_command(*msg);
+
+    // Set steering directly, as control is handled on device
     auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
 
-    // Copy the newest message into last_ack and move speed field into
-    // acceleration field
-    ackermann_msgs::msg::AckermannDrive pub_msg;
-    pub_msg.acceleration = msg->speed;
-    pub_msg.steering_angle = ratio(msg->steering_angle);
-
-    // If we've received any encoder messages from the CAN bus, we grab its speed value otherwise set it to zero
-    if (!enc_msgs.empty()) {
-        pub_msg.speed = enc_msgs.front().speed;
-        enc_msgs.pop_front();
-    } else {
-        pub_msg.speed = 0.0;
-    }
-    _odom_acks_pub->get()->publish(pub_msg);
-
-    // Steering/Drive message to send over
-    serial::drive_msg drv_msg{};
     serial::steer_msg st_msg{};
-
-    // Get percentage brake and throttle and send their respective messages
-    if (msg->speed < 0) {
-        auto percent_brake = static_cast<uint8_t>((msg->speed / _max_brake_speed) * 100);
-        drv_msg.type = pir::CanMappings::SetBrake;
-        drv_msg.speed = percent_brake;
-    } else {
-        auto percent_throttle = static_cast<uint8_t>((msg->speed / _max_throttle_speed) * 100);
-        drv_msg.type = pir::CanMappings::SetThrottle;
-        drv_msg.speed = percent_throttle;
-    }
-    drv_msg.length = 1;
-
-    // Send a drive message to the interface device to publish onto the CAN bus
-    RCLCPP_INFO(this->get_logger(), "Sending drive msg with speed: %u", drv_msg.speed);
-    if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&drv_msg), sizeof(serial::drive_msg)) == -1) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device: %s with fd: %d",
-                     cur_device.port_name.c_str(), cur_device.handler->get_fd());
-    }
-
-    // Create a steering message
     st_msg.type = pir::CanMappings::SetAngle;
-    st_msg.length = 8;
     st_msg.angle = ratio(msg->steering_angle);
-    st_msg.position = 0.0;
 
     // Send a steering message to the interface device to publish onto the CAN bus
-    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f, position: %f", st_msg.angle, st_msg.position);
+    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
     if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) == -1) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device: %s with fd: %d",
                      cur_device.port_name.c_str(), cur_device.handler->get_fd());
     }
 }
 
+// Keep in mind, this occurs in the read thread
 void pir::PhnxIoRos::read_data(serial::message m) {
     auto kill = std::make_shared<robot_state_msgs::srv::SetState::Request>();
     serial::enc_msg* msg;
@@ -120,6 +95,7 @@ void pir::PhnxIoRos::read_data(serial::message m) {
 
     // If we receive an auton kill message, we send a service request to drive mode switch to switch the kart to a killed state
     // If we receive an encoder tick, we add it to our vector to be used when the next control message arrives
+    nav_msgs::msg::Odometry odom{};
     switch (m.type) {
         case CanMappings::KillAuton:
             RCLCPP_WARN(this->get_logger(), "Auton kill signal received!");
@@ -127,13 +103,51 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             this->_robot_state_client->async_send_request(kill);
             break;
         case CanMappings::EncoderTick:
+            // Publish odom from encoder
             msg = reinterpret_cast<serial::enc_msg*>(m.data);
-            enc_msgs.push_back(*msg);
-            RCLCPP_INFO(this->get_logger(), "Received encoder tick!");
+
+            odom.twist.twist.linear.x = msg->speed;
+            odom.header.stamp = this->get_clock()->now();
+            this->_odom_pub->publish(odom);
             break;
         default:
             RCLCPP_INFO(this->get_logger(), "Received non encoder tick/auton kill message!");
             break;
+    }
+}
+
+void pir::PhnxIoRos::filtered_odom_cb(nav_msgs::msg::Odometry::ConstSharedPtr msg) { this->pid->add_feedback(*msg); }
+
+void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedController::Actuator> control) {
+    auto [val, actuator] = control;
+
+    RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
+
+    serial::drive_msg throttle{};
+    serial::drive_msg brake{};
+
+    if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
+        // Set throttle to control, and zero brake
+        throttle.type = CanMappings::SetThrottle;
+        throttle.speed = uint8_t(val * 100);
+
+        brake.type = CanMappings::SetBrake;
+        brake.speed = 0;
+
+        // Send commands to can
+        this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
+        this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
+    } else {
+        // Set brake to control, and zero throttle
+        throttle.type = CanMappings::SetThrottle;
+        throttle.speed = 0;
+
+        brake.type = CanMappings::SetBrake;
+        brake.speed = uint8_t(val * 100);
+
+        // Send commands to can
+        this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
+        this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }
 

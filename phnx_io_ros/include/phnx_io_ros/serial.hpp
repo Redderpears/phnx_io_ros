@@ -16,24 +16,29 @@
 
 namespace serial {
 
+/// Drive message to can bus, either brake or throttle
 struct drive_msg {
     uint8_t type;
-    uint16_t length;
+    uint16_t length = 1;
+    /// Actuator engagement as a 0-100 percent
     uint8_t speed;
 } __attribute__((packed));
 
+/// Steering message to can bus
 struct steer_msg {
     uint8_t type;
-    uint16_t length;
+    uint16_t length = 4;
+    /// Angle in degrees to set the actuator, left positive.
     float angle;
-    float position;
 } __attribute__((packed));
 
+/// Received encoder message
 struct enc_msg {
     uint16_t ticks;
     float speed;
 } __attribute__((packed));
 
+/// Raw received can message
 struct message {
     uint8_t header;
     uint8_t type;

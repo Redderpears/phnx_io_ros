@@ -18,13 +18,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(robot_state_msgs REQUIRED)
+find_package(phnx_control REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(phnx_io_ros src/phnx_io_ros.cpp src/serial.cpp src/phnx_io_ros_node.cpp)
+add_executable(phnx_io_ros src/phnx_io_ros.cpp src/serial.cpp src/phnx_io_ros_node.cpp src/pid_interface.cpp)
 
 set(dependencies
         rclcpp
@@ -32,6 +34,8 @@ set(dependencies
         geometry_msgs
         ackermann_msgs
         robot_state_msgs
+        nav_msgs
+        phnx_control
         )
 ament_target_dependencies(
         phnx_io_ros
@@ -58,6 +62,7 @@ if (BUILD_TESTING)
             tests/unit.cpp
             src/phnx_io_ros_node.cpp
             src/serial.cpp
+            src/pid_interface.cpp
             )
     ament_target_dependencies(${PROJECT_NAME}-test ${dependencies})
     target_include_directories(${PROJECT_NAME}-test PUBLIC
