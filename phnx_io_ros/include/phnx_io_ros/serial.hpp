@@ -57,6 +57,9 @@ private:
     std::vector<uint8_t> tempData;
     std::function<void(message)> msgCallback;
 
+    /// Mutex that synchronizes writes
+    std::mutex write_mtx;
+
     /// Logs with either RCLCPP logs or normal stdout/stderr
     ///@param str string to write to the log
     ///@param severity severity of the log, 1 is warning, 0 is info, -1 is error,
@@ -87,12 +90,11 @@ public:
     ///@return number of bytes read, -1 returned on error
     static void read_process(void* param);
 
-    /// Write data to a connected serial port
+    /// Write data to a connected serial port. This is atomic and threadsafe.
     ///@param buf data to write to the port
     ///@param length length of data
-    ///@param port_num file descriptor for a connected port
     ///@return number of bytes written, -1 returned on error
-    int32_t write_packet(uint8_t* buf, uint32_t length) const;
+    int32_t write_packet(uint8_t* buf, uint32_t length);
 
     /// Processes raw byte stream into messages
     ///@param buf raw buffer from read call
