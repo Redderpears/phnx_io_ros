@@ -33,6 +33,8 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
 
+    RCLCPP_INFO(this->get_logger(), "Connected to device!");
+
     // Start pid thread
     this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1));
 
@@ -135,6 +137,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         brake.speed = 0;
 
         // Send commands to can
+        RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     } else {
@@ -146,6 +149,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         brake.speed = uint8_t(val * 100);
 
         // Send commands to can
+        RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }

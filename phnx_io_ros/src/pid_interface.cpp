@@ -5,7 +5,7 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
     // Setup control thread
     this->thread = std::thread{[this]() {
         // This loop runs at the speed of odom
-        while (this->stop_flag.load()) {
+        while (!this->stop_flag.load()) {
             // Wait for feedback
             nav_msgs::msg::Odometry odom;
             this->odom_queue.wait_dequeue(odom);
