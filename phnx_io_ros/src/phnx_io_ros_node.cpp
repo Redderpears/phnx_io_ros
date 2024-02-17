@@ -90,10 +90,6 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 void pir::PhnxIoRos::read_data(serial::message m) {
     auto kill = std::make_shared<robot_state_msgs::srv::SetState::Request>();
     serial::enc_msg* msg;
-    RCLCPP_INFO(this->get_logger(), "Received message:\n Type: %u\n Length: %u\n Data: \n", m.type, m.length);
-    for (int i = 0; i < m.length; i++) {
-        RCLCPP_INFO(this->get_logger(), "%u", m.data[i]);
-    }
 
     // If we receive an auton kill message, we send a service request to drive mode switch to switch the kart to a killed state
     // If we receive an encoder tick, we add it to our vector to be used when the next control message arrives
