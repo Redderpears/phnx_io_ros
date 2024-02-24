@@ -114,7 +114,10 @@ void pir::PhnxIoRos::read_data(serial::message m) {
     }
 }
 
-void pir::PhnxIoRos::filtered_odom_cb(nav_msgs::msg::Odometry::ConstSharedPtr msg) { this->pid->add_feedback(*msg); }
+void pir::PhnxIoRos::filtered_odom_cb(nav_msgs::msg::Odometry::ConstSharedPtr msg) {
+    this->pid->add_feedback(*msg);
+    RCLCPP_INFO(this->get_logger(), "Speed: %f", msg->twist.twist.linear.x);
+}
 
 void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedController::Actuator> control) {
     auto [val, actuator] = control;

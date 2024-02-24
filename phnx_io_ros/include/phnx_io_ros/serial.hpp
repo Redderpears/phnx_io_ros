@@ -18,6 +18,7 @@ namespace serial {
 
 /// Drive message to can bus, either brake or throttle
 struct drive_msg {
+    uint8_t header = 0x54;
     uint8_t type;
     uint16_t length = 1;
     /// Actuator engagement as a 0-100 percent
@@ -26,6 +27,7 @@ struct drive_msg {
 
 /// Steering message to can bus
 struct steer_msg {
+    uint8_t header = 0x54;
     uint8_t type;
     uint16_t length = 4;
     /// Angle in degrees to set the actuator, left positive.
