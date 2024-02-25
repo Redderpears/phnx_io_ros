@@ -11,25 +11,27 @@ public:
 
 private:
     control_toolbox::Pid throttle_pid;
-    control_toolbox::Pid brake_pid;
     /// Stamp of the last feedback
     std::optional<rclcpp::Time> last_feedback;
-    /// Flag indicating if the brake is set
-    bool brake_active = false;
     /// Speed we want to reach
     double set_speed = 0.0;
-
-    void disable_breaks();
-    void disable_throttle();
+    /// Last outputted command
+    double last_command = 0.0;
+    /// Last feedback speed
+    double last_speed = 0.0;
 
 public:
-    explicit SpeedController();
+    explicit SpeedController(double p = 0.01, double i = 0.01, double d = 0, double max_i = 1, double min_i = 0,
+                             bool antiwindup = false);
 
     /// Updates the controller, and creates a new command. The returned tuple contains a
     /// 0.0-1.0 value for the actuator, as well as the enum initiating the actuator it applies to.
     std::tuple<double, Actuator> update(double speed, const rclcpp::Time& stamp);
 
     void update_set_speed(double speed);
+
+    /// Returns last (pe, ie, de, set speed, feedback)
+    std::tuple<double, double, double, double, double> get_components();
 };
 
 }  // namespace phnx_control
