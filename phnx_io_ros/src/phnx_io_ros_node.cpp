@@ -127,6 +127,11 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
 
+    // Remove risk of underflow
+    if (val < 0) {
+        val = 0;
+    }
+
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
