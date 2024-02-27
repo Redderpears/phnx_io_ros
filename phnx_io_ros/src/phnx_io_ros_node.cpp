@@ -1,3 +1,4 @@
+#include <cmath>
 #include <rclcpp/rclcpp.hpp>
 
 #include "libackermann/libackermann.hpp"
@@ -76,7 +77,9 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 
     serial::steer_msg st_msg{};
     st_msg.type = pir::CanMappings::SetAngle;
-    st_msg.angle = ratio(msg->steering_angle);
+
+    // ROS steering is in rad, bus is in degrees
+    st_msg.angle = ratio(msg->steering_angle) / M_PI * 180;
 
     // Send a steering message to the interface device to publish onto the CAN bus
     RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
@@ -99,6 +102,9 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             RCLCPP_WARN(this->get_logger(), "Auton kill signal received!");
             kill->state.state = robot_state_msgs::msg::State::KILL;
             this->_robot_state_client->async_send_request(kill);
+
+            // Set PID to 0 set speed on estop, to avoid accumulating error when stopped.
+            this->pid->set_command(ackermann_msgs::msg::AckermannDrive{});
             break;
         case CanMappings::EncoderTick:
             // Publish odom from encoder
