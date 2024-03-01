@@ -24,6 +24,7 @@ enum CanMappings : uint32_t {
     SetThrottle = 0x6,
     EncoderTick = 0x7,
     TrainingMode = 0x8,
+    EnableAuton = 0x9,
 };
 
 /// Contains the device name as well as the serial object that acts as that device's handler for IO

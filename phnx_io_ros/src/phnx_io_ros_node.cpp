@@ -106,6 +106,14 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             // Set PID to 0 set speed on estop, to avoid accumulating error when stopped.
             this->pid->set_command(ackermann_msgs::msg::AckermannDrive{});
             break;
+
+        case CanMappings::EnableAuton:
+            RCLCPP_INFO(this->get_logger(), "Auton enable signal received!");
+            // Send enable transition
+            kill->state.state = robot_state_msgs::msg::State::ACTIVE;
+            this->_robot_state_client->async_send_request(kill);
+            break;
+
         case CanMappings::EncoderTick:
             // Publish odom from encoder
             msg = reinterpret_cast<serial::enc_msg*>(m.data);
