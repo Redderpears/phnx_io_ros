@@ -22,7 +22,7 @@ private:
 
 public:
     explicit SpeedController(double p = 0.01, double i = 0.01, double d = 0, double max_i = 1, double min_i = 0,
-                             bool antiwindup = false);
+                             bool antiwindup = true);
 
     /// Updates the controller, and creates a new command. The returned tuple contains a
     /// 0.0-1.0 value for the actuator, as well as the enum initiating the actuator it applies to.
