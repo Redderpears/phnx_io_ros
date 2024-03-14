@@ -6,6 +6,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "optional"
 #include "phnx_io_ros/pid_interface.hpp"
+#include "phnx_io_ros/roboteq.hpp"
 #include "phnx_io_ros/serial.hpp"
 #include "phnx_io_ros/vendor/concurrentqueue.h"
 #include "rclcpp/logger.hpp"
@@ -64,6 +65,9 @@ private:
     long _baud_rate{};
     device_info cur_device;
     int FAILURE_TOLERANCE{5};
+
+    /// Access to the roboteq motor controller
+    Roboteq roboteq;
 
     ///@brief Convert ackermann messages into CAN messages and send them to the
     /// CAN bus

@@ -36,6 +36,7 @@ Interface between ROS and the CAN bus. Handles receiving sensor data and also pr
   monitor
   if plugged in. This can be by USB, or UART.
 - `baud_rate`: Baud rate to use when connecting to a Teensy.
+- `motor_scale`: Percent of max motor power to scale the output by, in 0-1 range.
 
 ### gz_io_ros
 

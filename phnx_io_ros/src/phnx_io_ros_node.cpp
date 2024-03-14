@@ -4,7 +4,8 @@
 #include "libackermann/libackermann.hpp"
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
-pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", options) {
+pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
+    : Node("phnx_io_ros", options), roboteq(this->declare_parameter<float>("motor_scale", 0.2)) {
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
@@ -15,6 +16,12 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
+
+    if (this->roboteq.connect()) {  // TODO loop until connected?
+        RCLCPP_INFO(this->get_logger(), "Connected to roboteq!");
+    } else {
+        RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
+    }
 
     // Find connected interface ECU connected to a USB port
     while (find_devices() != 0) {
@@ -145,6 +152,9 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     if (val < 0) {
         val = 0;
     }
+    if (val > 1) {
+        val = 1;
+    }
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
@@ -158,6 +168,17 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
+
+        // Send command to Roboteq
+        try {
+            bool res = this->roboteq.set_power(float(val));
+
+            if (res) {
+                RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
+            }
+        } catch (std::system_error& error) {
+            RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
+        }
     } else {
         // Set brake to control, and zero throttle
         throttle.type = CanMappings::SetThrottle;
