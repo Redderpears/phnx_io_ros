@@ -55,6 +55,8 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr _odom_pub;
     /// Connection to the robot state server, to allow for estopping
     rclcpp::Client<robot_state_msgs::srv::SetState>::SharedPtr _robot_state_client;
+    /// Timer for checking voltage
+    rclcpp::TimerBase::SharedPtr voltage_timer;
 
     /// PID controller
     std::unique_ptr<PidInterface> pid;

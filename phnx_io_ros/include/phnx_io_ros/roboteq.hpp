@@ -12,11 +12,13 @@
 #include "glob.h"
 #include "optional"
 
-/// Interface to a Roboteq motor controller connected over USB.
+/// Interface to a Roboteq motor controller connected over USB. Threadsafe through internal locking.
 class Roboteq {
     std::unique_ptr<mn::CppLinuxSerial::SerialPort> serial;
     /// 0-1 float to scale all commands by. Caps the speed.
     float power_scale;
+    /// Serial port mtx
+    std::mutex mtx;
 
     /// Finds the usb port for the roboteq
     std::optional<std::string> enumerate_port() {
@@ -61,6 +63,8 @@ public:
 
     /// Sets the motor to the percent power, governed by power scaling.
     bool set_power(float percent) {
+        std::unique_lock lk{mtx};
+
         // Scale output
         uint16_t level = percent * 1000 * this->power_scale;
 
@@ -75,6 +79,8 @@ public:
 
     /// Send a ping to the Roboteq, and check for its response.
     bool check_alive() {
+        std::unique_lock lk{mtx};
+
         // Send ENQ
         std::vector<uint8_t> vec{0x5};
         this->serial->WriteBinary(vec);
@@ -84,5 +90,36 @@ public:
 
         // ACK
         return vec[0] == 0x6;
+    }
+
+    /// Get battery voltage, if possible.
+    std::optional<float> get_batt_voltage() {
+        std::unique_lock lk{mtx};
+
+        // Ask for battery voltage
+        this->serial->Write(std::string{"?V 2 _"});
+
+        std::string res{};
+        this->serial->Read(res);
+
+        // Should be V=XXX, where XXX is voltage*10
+        if (res.size() > 3) {
+            auto volts_str = res.substr(2, 3);
+
+            // A lot of things can go wrong, so probe in the right direction
+            try {
+                float volts = std::stof(volts_str) / 10.0f;
+
+                if (volts > 40 && volts < 60) {
+                    return volts;
+                } else {
+                    return std::nullopt;
+                }
+            } catch (std::invalid_argument& e) {
+                return std::nullopt;
+            }
+        }
+
+        return std::nullopt;
     }
 };

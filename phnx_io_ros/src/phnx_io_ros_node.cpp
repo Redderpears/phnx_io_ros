@@ -23,6 +23,17 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
     }
 
+    // Check voltage on a timer
+    this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
+        auto maybe_voltage = this->roboteq.get_batt_voltage();
+
+        if (maybe_voltage) {
+            RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage); //TODO pub sound if low
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Failed read!");
+        }
+    });
+
     // Find connected interface ECU connected to a USB port
     while (find_devices() != 0) {
         rclcpp::sleep_for(std::chrono::milliseconds(500));
