@@ -17,20 +17,28 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
 
-    if (this->roboteq.connect()) {  // TODO loop until connected?
-        RCLCPP_INFO(this->get_logger(), "Connected to roboteq!");
-    } else {
+    // Connect to roboteq over USB
+    while (!this->roboteq.connect()) {
         RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
+    RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
 
     // Check voltage on a timer
     this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
-        auto maybe_voltage = this->roboteq.get_batt_voltage();
+        // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
+        if (!this->killed) {
+            try {
+                auto maybe_voltage = this->roboteq.get_batt_voltage();
 
-        if (maybe_voltage) {
-            RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage); //TODO pub sound if low
-        } else {
-            RCLCPP_INFO(this->get_logger(), "Failed read!");
+                if (maybe_voltage) {
+                    RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage);  //TODO pub sound if low
+                } else {
+                    RCLCPP_ERROR(this->get_logger(), "Failed read!");
+                }
+            } catch (std::system_error& e) {
+                RCLCPP_ERROR(this->get_logger(), "Failed read with %s", e.what());
+            }
         }
     });
 
@@ -58,7 +66,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1));
 
     /* Now we have three threads:
-     * 1) Main node thread subs and pubs
+     * 1) Main node thread subs and pubs, as well as Roboteq voltage
      * 2) CAN read thread
      * 3) PID control thread, which writes to CAN
      */
@@ -87,6 +95,11 @@ int pir::PhnxIoRos::find_devices() {
 }
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
+    // If killed, make sure we avoid updating the pid, so it says at 0
+    if (this->killed) {
+        return;
+    }
+
     // Send speed command to PID
     this->pid->set_command(*msg);
 
@@ -112,8 +125,6 @@ void pir::PhnxIoRos::read_data(serial::message m) {
     auto kill = std::make_shared<robot_state_msgs::srv::SetState::Request>();
     serial::enc_msg* msg;
 
-    // If we receive an auton kill message, we send a service request to drive mode switch to switch the kart to a killed state
-    // If we receive an encoder tick, we add it to our vector to be used when the next control message arrives
     nav_msgs::msg::Odometry odom{};
     switch (m.type) {
         case CanMappings::KillAuton:
@@ -121,12 +132,31 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             kill->state.state = robot_state_msgs::msg::State::KILL;
             this->_robot_state_client->async_send_request(kill);
 
+            this->killed = true;
             // Set PID to 0 set speed on estop, to avoid accumulating error when stopped.
             this->pid->set_command(ackermann_msgs::msg::AckermannDrive{});
+
+            // Also set roboteq to zero, so it actually stops, since PID will no longer send commands
+            try {
+                bool res = this->roboteq.set_power(0);
+
+                if (res) {
+                    RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
+                }
+            } catch (std::system_error& error) {
+                RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
+            }
+
             break;
 
         case CanMappings::EnableAuton:
             RCLCPP_INFO(this->get_logger(), "Auton enable signal received!");
+
+            // Wait for brake to unclamp, so we don't stall the motor
+            rclcpp::sleep_for(std::chrono::milliseconds{2000});
+
+            this->killed = false;
+
             // Send enable transition
             kill->state.state = robot_state_msgs::msg::State::ACTIVE;
             this->_robot_state_client->async_send_request(kill);
@@ -147,11 +177,21 @@ void pir::PhnxIoRos::read_data(serial::message m) {
 }
 
 void pir::PhnxIoRos::filtered_odom_cb(nav_msgs::msg::Odometry::ConstSharedPtr msg) {
+    // If killed, make sure we avoid updating the pid, so it says at 0
+    if (this->killed) {
+        return;
+    }
+
     this->pid->add_feedback(*msg);
     RCLCPP_INFO(this->get_logger(), "Speed: %f", msg->twist.twist.linear.x);
 }
 
 void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedController::Actuator> control) {
+    // This shouldn't be possible, but avoid sending commands when killed as a sanity check
+    if (this->killed) {
+        return;
+    }
+
     auto [val, actuator] = control;
 
     RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
@@ -159,7 +199,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
 
-    // Remove risk of underflow
+    // Fit to limits
     if (val < 0) {
         val = 0;
     }
