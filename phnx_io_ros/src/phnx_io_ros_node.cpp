@@ -94,6 +94,10 @@ int pir::PhnxIoRos::find_devices() {
     return 0;
 }
 
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
     // If killed, make sure we avoid updating the pid, so it says at 0
     if (this->killed) {
@@ -103,14 +107,17 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     // Send speed command to PID
     this->pid->set_command(*msg);
 
-    // Set steering directly, as control is handled on device
-    auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
-
     serial::steer_msg st_msg{};
     st_msg.type = pir::CanMappings::SetAngle;
 
     // ROS steering is in rad, bus is in degrees
-    st_msg.angle = ratio(msg->steering_angle) / M_PI * 180;
+    st_msg.angle = msg->steering_angle / M_PI * 180;
+
+    /* Found with arctan(1.08/3.85), where 1.08m is the wheelbase, and 3.85m is the turning radius. This leads to phnx
+       Having a max steering angle of 15 degrees or so. 24 is just the max on the ST board, which linearly maps the range.
+       This may not be accurate (the steering range may not be linear), but is a decent approximation
+    */
+    st_msg.angle = mapfloat(st_msg.angle, -15.66, 15.66, -24, 24);
 
     // Send a steering message to the interface device to publish onto the CAN bus
     RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
