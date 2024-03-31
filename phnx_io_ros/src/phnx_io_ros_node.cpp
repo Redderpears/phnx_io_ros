@@ -160,8 +160,9 @@ void pir::PhnxIoRos::read_data(serial::message m) {
         case CanMappings::EnableAuton:
             RCLCPP_INFO(this->get_logger(), "Auton enable signal received!");
 
-            // Wait for brake to unclamp, so we don't stall the motor
-            rclcpp::sleep_for(std::chrono::milliseconds{2000});
+            // Wait for brake to unclamp, so we don't stall the motor. This also gives the steering time to home.
+            // This wait allows for us to avoid having silly "wait 5 seconds" in our SOP.
+            rclcpp::sleep_for(std::chrono::seconds{10});
 
             this->killed = false;
 
