@@ -1,7 +1,6 @@
 #include <cmath>
 #include <rclcpp/rclcpp.hpp>
 
-#include "libackermann/libackermann.hpp"
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)

@@ -40,6 +40,9 @@ class Roboteq {
         return std::string{*gstruct.gl_pathv};
     }
 
+    /// Checks if the roboteq response indicates ok.
+    bool check_msg_ok(const std::string& s) { return s.find('+') != std::string::npos; }
+
 public:
     explicit Roboteq(float power_scale) { this->power_scale = power_scale; }
 
@@ -74,7 +77,7 @@ public:
         std::string res{};
         this->serial->Read(res);
 
-        return res[0] == '+';
+        return this->check_msg_ok(res);
     }
 
     /// Send a ping to the Roboteq, and check for its response.
