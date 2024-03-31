@@ -16,8 +16,11 @@ class PidInterface {
     std::thread thread;
     /// Odom queue
     moodycamel::BlockingConcurrentQueue<nav_msgs::msg::Odometry> odom_queue{};
-    /// Command queue
-    moodycamel::ConcurrentQueue<ackermann_msgs::msg::AckermannDrive> command_queue{};
+
+    /// Most recent command
+    ackermann_msgs::msg::AckermannDrive current_command;
+    std::mutex command_mtx{};
+
     /// Called for each output of the PID
     std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb;
 

@@ -10,10 +10,10 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
             nav_msgs::msg::Odometry odom;
             this->odom_queue.wait_dequeue(odom);
 
-            // Set speed if available
-            ackermann_msgs::msg::AckermannDrive command;
-            if (this->command_queue.try_dequeue(command)) {
-                this->pid.update_set_speed(command.speed);
+            // Always set speed, even if not updated, to avoid queuing latency on commands
+            {
+                std::unique_lock lk{this->command_mtx};
+                this->pid.update_set_speed(this->current_command.speed);
             }
 
             // Get control
@@ -28,5 +28,6 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
 void PidInterface::add_feedback(const nav_msgs::msg::Odometry& speed) { this->odom_queue.enqueue(speed); }
 
 void PidInterface::set_command(const ackermann_msgs::msg::AckermannDrive& command) {
-    this->command_queue.enqueue(command);
+    std::unique_lock lk{this->command_mtx};
+    this->current_command = command;
 }

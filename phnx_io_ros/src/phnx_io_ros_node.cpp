@@ -113,6 +113,8 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     // ROS steering is in rad, bus is in degrees
     st_msg.angle = msg->steering_angle / M_PI * 180;
 
+    st_msg.angle = std::clamp(st_msg.angle, -15.66f, 15.66f);
+
     /* Found with arctan(1.08/3.85), where 1.08m is the wheelbase, and 3.85m is the turning radius. This leads to phnx
        Having a max steering angle of 15 degrees or so. 24 is just the max on the ST board, which linearly maps the range.
        This may not be accurate (the steering range may not be linear), but is a decent approximation
@@ -207,12 +209,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg brake{};
 
     // Fit to limits
-    if (val < 0) {
-        val = 0;
-    }
-    if (val > 1) {
-        val = 1;
-    }
+    val = std::clamp(val, 0.0, 1.0);
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
