@@ -61,7 +61,7 @@ private:
     /// PID controller
     std::unique_ptr<PidInterface> pid;
     /// Killed state from CAN. This will also exist in the robot state controller, but we need it locally as well.
-    bool killed = true;
+    bool killed = false;
 
     // Serial port params
     std::string _port_pattern{};
