@@ -120,6 +120,11 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     */
     st_msg.angle = mapfloat(st_msg.angle, -15.66, 15.66, -24, 24);
 
+    {
+        std::unique_lock lk{this->last_steering_mtx};
+        this->last_steering_angle = st_msg.angle;
+    }
+
     // Send a steering message to the interface device to publish onto the CAN bus
     RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
     if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) == -1) {
@@ -175,8 +180,18 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             // Publish odom from encoder
             msg = reinterpret_cast<serial::enc_msg*>(m.data);
 
-            odom.twist.twist.linear.x = msg->speed;
-            odom.header.stamp = this->get_clock()->now();
+            {
+                std::unique_lock lk{this->last_steering_mtx};
+
+                odom.twist.twist.linear.x = msg->speed;
+                odom.twist.twist.linear.y = 0;
+                odom.header.stamp = this->get_clock()->now();
+
+                odom.twist.covariance.at(0) =
+                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
+                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
+            }
+
             this->_odom_pub->publish(odom);
             break;
         default:

@@ -72,6 +72,9 @@ private:
 
     /// Access to the roboteq motor controller
     Roboteq roboteq;
+    /// Last received steering command (degrees)
+    float last_steering_angle = 0.0;
+    std::mutex last_steering_mtx;
 
     ///@brief Convert ackermann messages into CAN messages and send them to the
     /// CAN bus
