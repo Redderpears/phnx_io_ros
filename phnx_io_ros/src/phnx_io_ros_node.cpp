@@ -236,8 +236,12 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
 
         // Send commands to can
         RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
-        this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
-        this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
+        auto wrt_res = this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
+        wrt_res += this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
+
+        if (wrt_res < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Writing to interface failed!");
+        }
 
         // Send command to Roboteq
         try {
