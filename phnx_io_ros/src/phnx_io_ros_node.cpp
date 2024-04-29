@@ -184,12 +184,12 @@ void pir::PhnxIoRos::read_data(serial::message m) {
                 std::unique_lock lk{this->last_steering_mtx};
 
                 odom.twist.twist.linear.x = msg->speed;
-                odom.twist.twist.linear.y = 0;
+//                odom.twist.twist.linear.y = 0;
                 odom.header.stamp = this->get_clock()->now();
 
-                odom.twist.covariance.at(0) =
-                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
-                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
+//                odom.twist.covariance.at(0) = TODO in theory these lines represent the encoder better, needs tuning
+//                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
+//                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
             }
 
             this->_odom_pub->publish(odom);
