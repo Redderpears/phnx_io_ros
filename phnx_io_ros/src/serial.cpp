@@ -140,8 +140,24 @@ void serial::serial::process_packet(char* buf, int len) {
     msgCallback(m);
 }
 
-int32_t serial::serial::write_packet(uint8_t* buf, uint32_t length) const {
-    return (int32_t)write(this->fd, buf, length);
+int32_t serial::serial::write_packet(uint8_t* buf, uint32_t length) {
+    std::unique_lock lk{this->write_mtx};
+
+    uint32_t remaining = length;
+    uint32_t written = 0;
+
+    while (remaining != 0) {
+        auto ret = write(this->fd, buf + written, remaining);
+
+        if (ret == -1) {
+            return -1;
+        } else {
+            remaining -= ret;
+            written += ret;
+        }
+    }
+
+    return (int)written;
 }
 
 void serial::serial::close_connection() {

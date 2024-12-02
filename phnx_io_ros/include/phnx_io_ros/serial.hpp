@@ -16,24 +16,31 @@
 
 namespace serial {
 
+/// Drive message to can bus, either brake or throttle
 struct drive_msg {
+    uint8_t header = 0x54;
     uint8_t type;
-    uint16_t length;
+    uint16_t length = 1;
+    /// Actuator engagement as a 0-100 percent
     uint8_t speed;
 } __attribute__((packed));
 
+/// Steering message to can bus
 struct steer_msg {
+    uint8_t header = 0x54;
     uint8_t type;
-    uint16_t length;
+    uint16_t length = 4;
+    /// Angle in degrees to set the actuator, left positive.
     float angle;
-    float position;
 } __attribute__((packed));
 
+/// Received encoder message
 struct enc_msg {
     uint16_t ticks;
     float speed;
 } __attribute__((packed));
 
+/// Raw received can message
 struct message {
     uint8_t header;
     uint8_t type;
@@ -51,6 +58,9 @@ private:
     bool is_connected{false};
     std::vector<uint8_t> tempData;
     std::function<void(message)> msgCallback;
+
+    /// Mutex that synchronizes writes
+    std::mutex write_mtx;
 
     /// Logs with either RCLCPP logs or normal stdout/stderr
     ///@param str string to write to the log
@@ -82,12 +92,11 @@ public:
     ///@return number of bytes read, -1 returned on error
     static void read_process(void* param);
 
-    /// Write data to a connected serial port
+    /// Write data to a connected serial port. This is atomic and threadsafe.
     ///@param buf data to write to the port
     ///@param length length of data
-    ///@param port_num file descriptor for a connected port
     ///@return number of bytes written, -1 returned on error
-    int32_t write_packet(uint8_t* buf, uint32_t length) const;
+    int32_t write_packet(uint8_t* buf, uint32_t length);
 
     /// Processes raw byte stream into messages
     ///@param buf raw buffer from read call
