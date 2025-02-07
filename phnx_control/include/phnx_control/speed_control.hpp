@@ -1,6 +1,9 @@
 #pragma once
 
+#include <rclcpp/rclcpp.hpp>
+
 #include "control_toolbox/pid.hpp"
+#include <optional>
 
 namespace phnx_control {
 
