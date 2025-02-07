@@ -6,7 +6,7 @@ SpeedController::SpeedController(double p, double i, double d, double max_i, dou
     this->throttle_pid.initPid(p, i, d, max_i, min_i, antiwindup);
 }
 
-std::tuple<double, SpeedController::Actuator> SpeedController::update(double speed, const rclcpp::Time &stamp) {
+std::tuple<double, SpeedController::Actuator> SpeedController::update(double speed, const rclcpp::Time& stamp) {
     uint64_t dt;
     if (!this->last_feedback.has_value()) {
         dt = 0;
