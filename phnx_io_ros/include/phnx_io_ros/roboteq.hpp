@@ -25,7 +25,7 @@ class Roboteq {
         // DO NOT INITIALIZE THIS WILL BREAK GLOB
         glob64_t gstruct;
 
-        int result = glob64("/dev/serial/by-id/usb-Roboteq_Motor_Controller*", GLOB_ERR, NULL, &gstruct);
+        int result = glob64("/dev/serial/by-id/usb-RoboteQ_*", GLOB_ERR, NULL, &gstruct);
 
         // Ensure we actually found a serial port
         if (result != 0) {
@@ -68,7 +68,10 @@ public:
     bool set_power(float percent) {
         std::unique_lock lk{mtx};
 
-        // Scale output
+        // Scale output 
+        // Might need to lower this with the new ESC (maybe 250? -berto)
+        // int berto = 250;
+        // int not-berto= 1000;
         uint16_t level = percent * 1000 * this->power_scale;
 
         // Send go command to percent max power

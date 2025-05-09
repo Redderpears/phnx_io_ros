@@ -11,35 +11,37 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
 
     _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
-        "/robot/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
+        "/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
 
     // Connect to roboteq over USB
     while (!this->roboteq.connect()) {
-        RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
+        // RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
     RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
+    RCLCPP_INFO(this->get_logger(), "Roboteq check commeneted out!");
+
 
     // Check voltage on a timer
-    this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
-        // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
-        if (!this->killed) {
-            try {
-                auto maybe_voltage = this->roboteq.get_batt_voltage();
+    // this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
+    //     // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
+    //     if (!this->killed) {
+    //         try {
+    //             auto maybe_voltage = this->roboteq.get_batt_voltage();
 
-                if (maybe_voltage) {
-                    RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage);  //TODO pub sound if low
-                } else {
-                    RCLCPP_ERROR(this->get_logger(), "Failed read!");
-                }
-            } catch (std::system_error& e) {
-                RCLCPP_ERROR(this->get_logger(), "Failed read with %s", e.what());
-            }
-        }
-    });
+    //             if (maybe_voltage) {
+    //                 RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage);  //TODO pub sound if low
+    //             } else {
+    //                 RCLCPP_ERROR(this->get_logger(), "Failed read!");
+    //             }
+    //         } catch (std::system_error& e) {
+    //             RCLCPP_ERROR(this->get_logger(), "Failed read with %s", e.what());
+    //         }
+    //     }
+    // });
 
     // Find connected interface ECU connected to a USB port
     while (find_devices() != 0) {
@@ -99,6 +101,8 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
     // If killed, make sure we avoid updating the pid, so it says at 0
+    
+    // RCLCPP_INFO(this->get_logger(), "TEST TEST");
     if (this->killed) {
         return;
     }
@@ -224,7 +228,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg brake{};
 
     // Fit to limits
-    val = std::clamp(val, 0.0, 1.0);
+    val = std::clamp(val, 0.0, 1.0);  
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
@@ -248,7 +252,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
             bool res = this->roboteq.set_power(float(val));
 
             if (res) {
-                RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
+                // RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
             }
         } catch (std::system_error& error) {
             RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
