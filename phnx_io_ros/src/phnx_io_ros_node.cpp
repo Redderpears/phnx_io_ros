@@ -11,7 +11,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
 
     _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
-        "/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
+        "/robot/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
@@ -22,7 +22,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
     RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
-    RCLCPP_INFO(this->get_logger(), "Roboteq check commeneted out!");
+    
 
 
     // Check voltage on a timer
@@ -130,7 +130,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     }
 
     // Send a steering message to the interface device to publish onto the CAN bus
-    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
+    // RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
     if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) == -1) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device: %s with fd: %d",
                      cur_device.port_name.c_str(), cur_device.handler->get_fd());
@@ -211,7 +211,7 @@ void pir::PhnxIoRos::filtered_odom_cb(nav_msgs::msg::Odometry::ConstSharedPtr ms
     }
 
     this->pid->add_feedback(*msg);
-    RCLCPP_INFO(this->get_logger(), "Speed: %f", msg->twist.twist.linear.x);
+    // RCLCPP_INFO(this->get_logger(), "Speed: %f", msg->twist.twist.linear.x);
 }
 
 void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedController::Actuator> control) {
@@ -222,7 +222,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
 
     auto [val, actuator] = control;
 
-    RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
+    // RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
 
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
@@ -239,7 +239,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         brake.speed = 0;
 
         // Send commands to can
-        RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
+        // RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
         auto wrt_res = this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         wrt_res += this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
 
