@@ -228,18 +228,19 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg brake{};
 
     // Fit to limits
-    val = std::clamp(val, 0.0, 1.0);  
+    val = std::clamp(val, -1.0, 1.0);  
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(val * 100);
+        throttle.speed = uint8_t(std::abs(val) * 100);
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;
 
-        // Send commands to can
+        // Send commands to can, only the brakes use can *
         // RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
+        // actual power demand no longer handled thru can, kept just in case.
         auto wrt_res = this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         wrt_res += this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
 
@@ -268,6 +269,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         // Send commands to can
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
+        this->roboteq.set_power(0f); // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }

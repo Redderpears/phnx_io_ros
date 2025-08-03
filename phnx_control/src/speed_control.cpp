@@ -26,11 +26,6 @@ std::tuple<double, SpeedController::Actuator> SpeedController::update(double spe
 }
 
 void SpeedController::update_set_speed(double speed) {
-    // Kart cannot move backwards, so pin negative to zero.
-    if (speed < 0) {
-        speed = 0;
-    }
-
     this->set_speed = speed;
 }
 
