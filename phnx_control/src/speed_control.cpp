@@ -25,9 +25,7 @@ std::tuple<double, SpeedController::Actuator> SpeedController::update(double spe
     return std::make_tuple(command, Actuator::Throttle);
 }
 
-void SpeedController::update_set_speed(double speed) {
-    this->set_speed = speed;
-}
+void SpeedController::update_set_speed(double speed) { this->set_speed = speed; }
 
 std::tuple<double, double, double, double, double> SpeedController::get_components() {
     double p, i, d;
