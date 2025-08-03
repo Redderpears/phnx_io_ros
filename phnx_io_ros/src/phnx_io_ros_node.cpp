@@ -267,8 +267,8 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         // Send commands to can
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
-        this->roboteq.set_power(
-            0.0f);  // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
+        // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
+        this->roboteq.set_power(0.0f);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }
