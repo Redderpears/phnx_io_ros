@@ -262,7 +262,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         throttle.speed = 0;
 
         brake.type = CanMappings::SetBrake;
-        brake.speed = uint8_t(val * 100);
+        brake.speed = uint8_t(std::abs(val) * 100);
 
         // Send commands to can
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
